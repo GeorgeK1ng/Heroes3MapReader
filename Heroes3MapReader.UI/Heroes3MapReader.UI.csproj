@@ -6,12 +6,12 @@
         <TargetFramework Condition="'$(MobileTargetFramework)' == '' And '$(DesktopTargetFramework)' == '' And '$(EnableAndroidTargeting)' != 'true'">net8.0</TargetFramework>
         <Nullable>enable</Nullable>
         <LangVersion>latest</LangVersion>
+        <AssemblyName>Heroes3MapReader</AssemblyName>
+        <RootNamespace>Heroes3MapReader.UI</RootNamespace>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0' Or '$(TargetFramework)' == 'net6.0-windows7.0'">
-        <AssemblyName>Heroes3MapReader</AssemblyName>
-        <RootNamespace>Heroes3MapReader.UI</RootNamespace>
         <OutputType>WinExe</OutputType>
         <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
         <ApplicationManifest>app.manifest</ApplicationManifest>

@@ -16,6 +16,6 @@
     <Application.Styles>
         <FluentTheme />
         <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
-        <StyleInclude Source="avares://Heroes3MapReader.UI/Styles/SharedStyles.axaml"/>
+        <StyleInclude Source="avares://Heroes3MapReader/Styles/SharedStyles.axaml"/>
     </Application.Styles>
 </Application>
