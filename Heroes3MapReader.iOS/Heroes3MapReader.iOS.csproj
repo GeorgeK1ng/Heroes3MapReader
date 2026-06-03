@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net8.0-ios</TargetFramework>
+        <SupportedOSPlatformVersion>13.0</SupportedOSPlatformVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <ApplicationId>com.cactuspie.heroes3mapreader</ApplicationId>
+        <ApplicationTitle>Heroes 3 Map Reader</ApplicationTitle>
+        <ApplicationVersion>1</ApplicationVersion>
+        <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Avalonia.iOS" Version="11.1.3" />
+        <PackageReference Include="Avalonia.Fonts.Inter" Version="11.1.3" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Heroes3MapReader.UI\Heroes3MapReader.UI.csproj"
+                          AdditionalProperties="MobileTargetFramework=net8.0-ios" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="$(NuGetPackageRoot)ntextcat\0.3.65\content\LanguageModels\*.profile.xml"
+              Link="LanguageModels\%(Filename)%(Extension)"
+              CopyToOutputDirectory="PreserveNewest"
+              CopyToPublishDirectory="PreserveNewest"
+              Condition="Exists('$(NuGetPackageRoot)ntextcat\0.3.65\content\LanguageModels')" />
+    </ItemGroup>
+</Project>

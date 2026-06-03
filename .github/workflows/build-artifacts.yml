@@ -97,6 +97,8 @@ jobs:
           path: artifacts/${{ matrix.artifact_name }}
           if-no-files-found: error
 
+  # .NET 8 does not provide a linux-x86 desktop runtime identifier, so the AppImage job
+  # intentionally builds the supported Intel/AMD Linux desktop target: linux-x64.
   publish-linux-appimage:
     name: Publish ${{ matrix.artifact_name }}
     runs-on: ubuntu-latest
@@ -165,6 +167,58 @@ jobs:
         with:
           name: ${{ matrix.artifact_name }}
           path: artifacts/*.AppImage
+          if-no-files-found: error
+
+
+  # Unsigned iOS device IPA files cannot be produced without Apple signing assets,
+  # so CI builds simulator artifacts that verify the iOS head compiles.
+  publish-ios-simulator:
+    name: Publish ${{ matrix.artifact_name }}
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runtime: iossimulator-x64
+            artifact_name: Heroes3MapReader-ios-simulator-x64
+          - runtime: iossimulator-arm64
+            artifact_name: Heroes3MapReader-ios-simulator-arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install iOS workload
+        run: dotnet workload install ios
+
+      - name: Restore iOS simulator project
+        run: >-
+          dotnet restore Heroes3MapReader.iOS/Heroes3MapReader.iOS.csproj
+          --runtime ${{ matrix.runtime }}
+          /p:MobileTargetFramework=net8.0-ios
+
+      - name: Publish iOS simulator app
+        run: >-
+          dotnet publish Heroes3MapReader.iOS/Heroes3MapReader.iOS.csproj
+          --configuration Release
+          --framework net8.0-ios
+          --runtime ${{ matrix.runtime }}
+          --no-restore
+          --output artifacts/${{ matrix.artifact_name }}
+          /p:MobileTargetFramework=net8.0-ios
+          /p:DebugType=None
+          /p:DebugSymbols=false
+
+      - name: Upload iOS simulator artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: artifacts/${{ matrix.artifact_name }}
           if-no-files-found: error
 
   publish-android:
