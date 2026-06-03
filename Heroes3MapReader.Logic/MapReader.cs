@@ -96,6 +96,7 @@ public sealed class MapReader : IMapReader
         mapInfo.HasUnderground = reader.ReadBoolean();
         mapInfo.Name = BinaryReaderExtensions.ReadString(reader, _encoding);
         mapInfo.Description = BinaryReaderExtensions.ReadString(reader, _encoding);
+        mapInfo.DescriptionLanguage = MapLanguageDetector.Detect(mapInfo.Description);
         mapInfo.Difficulty = (MapDifficulty)reader.ReadByte();
 
         // Max hero level (AB+)

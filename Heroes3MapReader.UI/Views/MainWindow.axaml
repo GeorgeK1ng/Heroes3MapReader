@@ -158,6 +158,25 @@
                         </ComboBox>
                     </StackPanel>
 
+                    <!-- Description Language Filter -->
+                    <StackPanel Spacing="5">
+                        <TextBlock Text="Description Language" FontWeight="SemiBold"/>
+                        <ComboBox ItemsSource="{Binding MapLanguages}"
+                                  SelectedItem="{Binding SelectedDescriptionLanguage}"
+                                  HorizontalAlignment="Stretch"
+                                  ToolTip.Tip="Best-effort language detected from the map description">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Converter={StaticResource NullableEnumConverter}}"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <CheckBox Content="Hide duplicates"
+                              IsChecked="{Binding HideDuplicates}"
+                              ToolTip.Tip="Hide maps with the same name and description"/>
+
                     <!-- Map Size Filter -->
                     <views:MapSizeFilterControl MapSizeFilters="{Binding MapSizeFilters}" />
 
@@ -245,6 +264,9 @@
                                             Width="70"/>
                         <DataGridTextColumn Header="Difficulty"
                                             Binding="{Binding Map.Difficulty}"
+                                            Width="100"/>
+                        <DataGridTextColumn Header="Language"
+                                            Binding="{Binding Map.DescriptionLanguage}"
                                             Width="100"/>
                         <DataGridTextColumn Header="Victory"
                                             Binding="{Binding Map.VictoryCondition.Type, Converter={StaticResource VictoryConditionConverter}, Mode=OneWay}"
@@ -359,7 +381,7 @@
                                 <!-- Map Stats -->
                                 <StackPanel Spacing="5" Margin="0 0 0 -10">
                                     <TextBlock Text="Map Details" FontWeight="SemiBold"/>
-                                    <Grid ColumnDefinitions="Auto,10,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                                    <Grid ColumnDefinitions="Auto,10,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
                                         <TextBlock Grid.Row="0" Grid.Column="0" Text="Size:" FontWeight="Medium" Margin="0,0,0,5"/>
                                         <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding SelectedMap.Map.Size}" Margin="0,0,0,5"/>
 
@@ -385,8 +407,11 @@
                                         <TextBlock Grid.Row="5" Grid.Column="0" Text="Underground:" FontWeight="Medium" Margin="0,0,0,5"/>
                                         <TextBlock Grid.Row="5" Grid.Column="2" Text="{Binding SelectedMap.Map.HasUnderground}" Margin="0,0,0,5"/>
 
-                                        <TextBlock Grid.Row="6" Grid.Column="0" Text="File Path:" FontWeight="Medium" Margin="0,0,0,5"/>
-                                        <TextBox Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="3"
+                                        <TextBlock Grid.Row="6" Grid.Column="0" Text="Language:" FontWeight="Medium" Margin="0,0,0,5"/>
+                                        <TextBlock Grid.Row="6" Grid.Column="2" Text="{Binding SelectedMap.Map.DescriptionLanguage}" Margin="0,0,0,5"/>
+
+                                        <TextBlock Grid.Row="7" Grid.Column="0" Text="File Path:" FontWeight="Medium" Margin="0,0,0,5"/>
+                                        <TextBox Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="3"
                                                  Classes="selectableLabel"
                                                  Text="{Binding SelectedMap.FilePath}"
                                                  Margin="0,0,0,5"/>

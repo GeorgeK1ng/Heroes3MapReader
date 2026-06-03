@@ -52,6 +52,12 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool? _selectedHasUnderground;
 
     [ObservableProperty]
+    private MapLanguage? _selectedDescriptionLanguage;
+
+    [ObservableProperty]
+    private bool _hideDuplicates;
+
+    [ObservableProperty]
     private MapItemViewModel? _selectedMap;
 
     [ObservableProperty]
@@ -100,6 +106,7 @@ public partial class MainWindowViewModel : ViewModelBase
         Difficulties = Enum.GetValues<MapDifficulty>().Cast<MapDifficulty?>().Prepend(null).ToList();
         VictoryConditions = Enum.GetValues<VictoryConditionType>().Cast<VictoryConditionType?>().Prepend(null).ToList();
         MapFormats = Enum.GetValues<MapFormat>().Cast<MapFormat?>().Prepend(null).ToList();
+        MapLanguages = Enum.GetValues<MapLanguage>().Cast<MapLanguage?>().Prepend(null).ToList();
 
         foreach (FactionType faction in Enum.GetValues<FactionType>())
         {
@@ -158,6 +165,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public List<MapDifficulty?> Difficulties { get; }
     public List<VictoryConditionType?> VictoryConditions { get; }
     public List<MapFormat?> MapFormats { get; }
+    public List<MapLanguage?> MapLanguages { get; }
     public List<bool?> HasUndergroundOptions { get; } = [null, true, false];
 
     public bool CanLoadMaps => !string.IsNullOrWhiteSpace(DirectoryPath) && !IsLoading;
@@ -188,6 +196,16 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     partial void OnSelectedHasUndergroundChanged(bool? value)
+    {
+        ApplyFiltersAndSort();
+    }
+
+    partial void OnSelectedDescriptionLanguageChanged(MapLanguage? value)
+    {
+        ApplyFiltersAndSort();
+    }
+
+    partial void OnHideDuplicatesChanged(bool value)
     {
         ApplyFiltersAndSort();
     }
@@ -432,6 +450,8 @@ public partial class MainWindowViewModel : ViewModelBase
         VictoryConditionType? selectedVictoryCondition = SelectedVictoryCondition;
         MapFormat? selectedFormat = SelectedFormat;
         bool? selectedHasUnderground = SelectedHasUnderground;
+        MapLanguage? selectedDescriptionLanguage = SelectedDescriptionLanguage;
+        bool hideDuplicates = HideDuplicates;
         List<FactionType> selectedFactions = FactionFilters.Where(f => f.IsSelected).Select(f => f.Faction).ToList();
         List<SpellType> selectedSpells = SpellFilters.Where(f => f.IsSelected).Select(f => f.Spell).ToList();
         string searchText = SearchText;
@@ -477,6 +497,11 @@ public partial class MainWindowViewModel : ViewModelBase
                 filtered = filtered.Where(m => m.Map.HasUnderground == selectedHasUnderground.Value);
             }
 
+            if (selectedDescriptionLanguage.HasValue)
+            {
+                filtered = filtered.Where(m => m.Map.DescriptionLanguage == selectedDescriptionLanguage.Value);
+            }
+
             if (selectedFactions.Count > 0)
             {
                 filtered = filtered.Where(m =>
@@ -501,6 +526,13 @@ public partial class MainWindowViewModel : ViewModelBase
                     (m.Map.Name?.Contains(searchText, StringComparison.OrdinalIgnoreCase) == true) ||
                     (m.Map.Description?.Contains(searchText, StringComparison.OrdinalIgnoreCase) == true)
                 );
+            }
+
+            if (hideDuplicates)
+            {
+                filtered = filtered
+                    .GroupBy(m => GetDuplicateKey(m.Map.Name, m.Map.Description), StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First());
             }
 
             List<MapItemViewModel> result = filtered.ToList();
@@ -540,6 +572,8 @@ public partial class MainWindowViewModel : ViewModelBase
         SelectedVictoryCondition = null;
         SelectedFormat = null;
         SelectedHasUnderground = null;
+        SelectedDescriptionLanguage = null;
+        HideDuplicates = false;
 
         foreach (FactionFilterItemViewModel filter in FactionFilters)
         {
@@ -590,6 +624,21 @@ public partial class MainWindowViewModel : ViewModelBase
     private void UpdateSelectedSpellCount()
     {
         SelectedSpellCount = SpellFilters.Count(f => f.IsSelected);
+    }
+
+    private static string GetDuplicateKey(string? name, string? description)
+    {
+        return $"{NormalizeDuplicateText(name)}\n{NormalizeDuplicateText(description)}";
+    }
+
+    private static string NormalizeDuplicateText(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        return string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
     }
 
     private void SaveApplicationSettings()

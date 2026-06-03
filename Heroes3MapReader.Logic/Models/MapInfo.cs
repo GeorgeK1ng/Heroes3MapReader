@@ -23,6 +23,11 @@ public sealed class MapInfo
     public string Description { get; set; } = string.Empty;
 
     /// <summary>
+    /// Best-effort language detected from the map description.
+    /// </summary>
+    public MapLanguage DescriptionLanguage { get; set; } = MapLanguage.Unknown;
+
+    /// <summary>
     /// Map difficulty level
     /// </summary>
     public MapDifficulty Difficulty { get; set; }
