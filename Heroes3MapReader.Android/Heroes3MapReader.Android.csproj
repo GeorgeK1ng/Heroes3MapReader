@@ -18,7 +18,8 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Heroes3MapReader.UI\Heroes3MapReader.UI.csproj" />
+        <ProjectReference Include="..\Heroes3MapReader.UI\Heroes3MapReader.UI.csproj"
+                          AdditionalProperties="EnableAndroidTargeting=true" />
     </ItemGroup>
 
     <ItemGroup>
