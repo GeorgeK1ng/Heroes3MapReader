@@ -56,3 +56,52 @@ jobs:
           name: ${{ matrix.artifact_name }}
           path: artifacts/${{ matrix.artifact_name }}
           if-no-files-found: error
+
+  publish-android:
+    name: Publish ${{ matrix.artifact_name }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runtime: android-arm
+            artifact_name: Heroes3MapReader-android-arm32
+          - runtime: android-arm64
+            artifact_name: Heroes3MapReader-android-arm64
+          - runtime: android-x64
+            artifact_name: Heroes3MapReader-android-x86_64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install Android workload
+        run: dotnet workload install android
+
+      - name: Restore Android project
+        run: dotnet restore Heroes3MapReader.Android/Heroes3MapReader.Android.csproj
+
+      - name: Publish Android APK
+        run: >-
+          dotnet publish Heroes3MapReader.Android/Heroes3MapReader.Android.csproj
+          --configuration Release
+          --framework net8.0-android
+          --runtime ${{ matrix.runtime }}
+          --no-restore
+          --output artifacts/${{ matrix.artifact_name }}
+          /p:AndroidPackageFormat=apk
+          /p:AndroidKeyStore=false
+          /p:DebugType=None
+          /p:DebugSymbols=false
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: artifacts/${{ matrix.artifact_name }}/**/*.apk
+          if-no-files-found: error

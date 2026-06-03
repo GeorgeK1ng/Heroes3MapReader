@@ -25,23 +25,30 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var mainWindow = new MainWindow();
-
-            var services = new ServiceCollection();
-            services.AddSingleton<IMapReader, MapReader>();
-            services.AddSingleton<IMapReaderFactory, MapReaderFactory>();
-            services.AddSingleton<IMapSpecificationRepository, MapSpecificationRepository>();
-            services.AddSingleton<IStreamDecompressor, StreamDecompressor>();
-            services.AddTransient<IStorageProvider>(_ => mainWindow.StorageProvider);
-            services.AddSingleton<ISpellSelectionWindowFactory, SpellSelectionWindowFactory>();
-            services.AddSingleton<ISettingsRepository, SettingsRepository>();
-            services.AddSingleton<MainWindowViewModel>();
-
-            ServiceProvider serviceProvider = services.BuildServiceProvider();
-
-            mainWindow.DataContext = serviceProvider.GetRequiredService<MainWindowViewModel>();
+            mainWindow.DataContext = CreateMainWindowViewModel(mainWindow.StorageProvider);
             desktop.MainWindow = mainWindow;
+        }
+        else if (ApplicationLifetime is ISingleViewApplicationLifetime singleViewPlatform)
+        {
+            singleViewPlatform.MainView = new MainView();
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    public MainWindowViewModel CreateMainWindowViewModel(IStorageProvider storageProvider)
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IMapReader, MapReader>();
+        services.AddSingleton<IMapReaderFactory, MapReaderFactory>();
+        services.AddSingleton<IMapSpecificationRepository, MapSpecificationRepository>();
+        services.AddSingleton<IStreamDecompressor, StreamDecompressor>();
+        services.AddSingleton(storageProvider);
+        services.AddSingleton<ISpellSelectionWindowFactory, SpellSelectionWindowFactory>();
+        services.AddSingleton<ISettingsRepository, SettingsRepository>();
+        services.AddSingleton<MainWindowViewModel>();
+
+        ServiceProvider serviceProvider = services.BuildServiceProvider();
+        return serviceProvider.GetRequiredService<MainWindowViewModel>();
     }
 }
