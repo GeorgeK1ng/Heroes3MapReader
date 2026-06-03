@@ -79,4 +79,12 @@
         <DependentUpon>MapSizeFilterControl.axaml</DependentUpon>
       </Compile>
     </ItemGroup>
+    <ItemGroup>
+        <None Include="$(NuGetPackageRoot)ntextcat\0.3.65\content\LanguageModels\*.profile.xml"
+              Link="LanguageModels\%(Filename)%(Extension)"
+              CopyToOutputDirectory="PreserveNewest"
+              CopyToPublishDirectory="PreserveNewest"
+              Condition="Exists('$(NuGetPackageRoot)ntextcat\0.3.65\content\LanguageModels')" />
+    </ItemGroup>
+
 </Project>

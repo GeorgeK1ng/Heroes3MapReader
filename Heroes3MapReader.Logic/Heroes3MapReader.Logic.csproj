@@ -13,4 +13,12 @@
         <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
         <PackageReference Include="System.Text.Encoding.CodePages" Version="10.0.1" />
     </ItemGroup>
+    <ItemGroup>
+        <None Include="$(NuGetPackageRoot)ntextcat\0.3.65\content\LanguageModels\*.profile.xml"
+              Link="LanguageModels\%(Filename)%(Extension)"
+              CopyToOutputDirectory="PreserveNewest"
+              CopyToPublishDirectory="PreserveNewest"
+              Condition="Exists('$(NuGetPackageRoot)ntextcat\0.3.65\content\LanguageModels')" />
+    </ItemGroup>
+
 </Project>
