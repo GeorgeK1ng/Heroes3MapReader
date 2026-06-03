@@ -68,7 +68,9 @@ public static class MapLanguageDetector
         }
 
         string languageCode = NormalizeLanguageCode(mostCertainLanguage.Item1.Iso639_3);
-        if (languageCode == UnknownLanguageCode || (IsCyrillicLanguageCode(languageCode) && !HasCyrillicText(description)))
+        if (languageCode == UnknownLanguageCode
+            || (IsCyrillicLanguageCode(languageCode) && !HasCyrillicText(description))
+            || (!IsCjkLanguageCode(languageCode) && HasCjkText(description)))
         {
             return DetectByScriptFallback(description);
         }
@@ -280,9 +282,19 @@ public static class MapLanguageDetector
         return languageCode is "rus" or "ukr" or "bel" or "bul" or "mkd" or "srp";
     }
 
+    private static bool IsCjkLanguageCode(string languageCode)
+    {
+        return languageCode is "zho" or "jpn" or "kor";
+    }
+
     private static bool HasCyrillicText(string text)
     {
         return text.Count(IsCyrillic) >= 3;
+    }
+
+    private static bool HasCjkText(string text)
+    {
+        return text.Count(IsCjk) >= 2;
     }
 
     private static bool IsBasicLatinOrLatinExtended(char character)

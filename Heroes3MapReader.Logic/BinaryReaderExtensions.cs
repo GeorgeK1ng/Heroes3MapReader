@@ -62,8 +62,6 @@ internal static class BinaryReaderExtensions
 
     private static IEnumerable<Encoding> GetCandidateEncodings(Encoding preferredEncoding)
     {
-        yield return preferredEncoding;
-
         Encoding? utf8 = GetStrictUtf8Encoding();
         if (utf8 != null)
         {
@@ -72,20 +70,24 @@ internal static class BinaryReaderExtensions
 
         int[] codePages =
         {
-            1250, // Central European: Czech, Polish, Hungarian, etc.
-            1251, // Cyrillic: Russian, Ukrainian, etc.
-            1252, // Western European: English, German, French, Swedish, etc.
-            1253, // Greek
-            1254, // Turkish
-            1257, // Baltic languages
-            1258, // Vietnamese
-            936,  // Simplified Chinese (GBK)
+            936,   // Simplified Chinese (GBK)
+            54936, // Simplified Chinese (GB18030)
+            950,   // Traditional Chinese (Big5)
+            1250,  // Central European: Czech, Polish, Hungarian, etc.
+            1251,  // Cyrillic: Russian, Ukrainian, etc.
+            1252,  // Western European: English, German, French, Swedish, etc.
+            1253,  // Greek
+            1254,  // Turkish
+            1257,  // Baltic languages
+            1258,  // Vietnamese
         };
 
         foreach (int codePage in codePages)
         {
             yield return Encoding.GetEncoding(codePage);
         }
+
+        yield return preferredEncoding;
     }
 
     private static Encoding? GetStrictUtf8Encoding()
@@ -165,6 +167,18 @@ internal static class BinaryReaderExtensions
         score -= replacementCount * 1000;
         score -= controlCount * 100;
 
+        int letterCount = latinCount + cyrillicCount + cjkCount + otherLetterCount;
+
+        if (cjkCount > 0)
+        {
+            score += cjkCount * 40;
+        }
+
+        if (cjkCount >= 2 && cjkCount >= letterCount * 0.2)
+        {
+            score += 1000 + cjkCount * 80;
+        }
+
         if (latinExtendedCount > 0)
         {
             score += CountCharacters(text, "áčďéěíňóřšťúůýžÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ") * 15;
@@ -172,6 +186,11 @@ internal static class BinaryReaderExtensions
             score += CountCharacters(text, "őűŐŰ") * 15;
             score += CountCharacters(text, "àâæçèêëîïôœùûüÿÀÂÆÇÈÊËÎÏÔŒÙÛÜŸ") * 10;
             score += CountCharacters(text, "äöüßÄÖÜẞåÅ") * 10;
+        }
+
+        if (latinExtendedCount > Math.Max(4, latinCount * 0.35) && CountAsciiLetters(text) < latinExtendedCount)
+        {
+            score -= latinExtendedCount * 20;
         }
 
         if (latinCount > cyrillicCount * 2 && cyrillicCount > 0)
@@ -190,6 +209,11 @@ internal static class BinaryReaderExtensions
         }
 
         return score;
+    }
+
+    private static int CountAsciiLetters(string text)
+    {
+        return text.Count(IsBasicLatin);
     }
 
     private static bool IsBasicLatin(char character)
