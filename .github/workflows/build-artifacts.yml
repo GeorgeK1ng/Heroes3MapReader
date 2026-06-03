@@ -84,7 +84,9 @@ jobs:
         run: dotnet workload install android
 
       - name: Restore Android project
-        run: dotnet restore Heroes3MapReader.Android/Heroes3MapReader.Android.csproj
+        run: >-
+          dotnet restore Heroes3MapReader.Android/Heroes3MapReader.Android.csproj
+          --runtime ${{ matrix.runtime }}
 
       - name: Publish Android APK
         run: >-
