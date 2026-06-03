@@ -1,0 +1,58 @@
+name: Build artifacts
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    name: Publish ${{ matrix.artifact_name }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runtime: win-x86
+            artifact_name: Heroes3MapReader-win-x86
+          - runtime: win-x64
+            artifact_name: Heroes3MapReader-win-x64
+          - runtime: win-arm64
+            artifact_name: Heroes3MapReader-win-arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore Heroes3MapReader.sln
+
+      - name: Build solution
+        run: dotnet build Heroes3MapReader.sln --configuration Release --no-restore
+
+      - name: Publish UI
+        run: >-
+          dotnet publish Heroes3MapReader.UI/Heroes3MapReader.UI.csproj
+          --configuration Release
+          --runtime ${{ matrix.runtime }}
+          --self-contained true
+          --output artifacts/${{ matrix.artifact_name }}
+          /p:PublishSingleFile=true
+          /p:IncludeNativeLibrariesForSelfExtract=true
+          /p:DebugType=None
+          /p:DebugSymbols=false
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: artifacts/${{ matrix.artifact_name }}
+          if-no-files-found: error
