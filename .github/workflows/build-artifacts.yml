@@ -170,19 +170,15 @@ jobs:
           if-no-files-found: error
 
 
-  # Unsigned iOS device IPA files cannot be produced without Apple signing assets,
-  # so CI builds simulator artifacts that verify the iOS head compiles.
-  publish-ios-simulator:
-    name: Publish ${{ matrix.artifact_name }}
+  # Unsigned iOS device IPA files cannot be produced without Apple signing assets.
+  # Simulator apps also cannot be published by `dotnet publish`, so CI performs one
+  # simulator build to verify the iOS head compiles and uploads that build output.
+  build-ios-simulator:
+    name: Build Heroes3MapReader-ios-simulator-x64
     runs-on: macos-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runtime: iossimulator-x64
-            artifact_name: Heroes3MapReader-ios-simulator-x64
-          - runtime: iossimulator-arm64
-            artifact_name: Heroes3MapReader-ios-simulator-arm64
+    env:
+      IOS_RUNTIME: iossimulator-x64
+      IOS_ARTIFACT_NAME: Heroes3MapReader-ios-simulator-x64
 
     steps:
       - name: Checkout repository
@@ -199,17 +195,20 @@ jobs:
       - name: Restore iOS simulator project
         run: >-
           dotnet restore Heroes3MapReader.iOS/Heroes3MapReader.iOS.csproj
-          --runtime ${{ matrix.runtime }}
+          --runtime ${{ env.IOS_RUNTIME }}
+          --disable-parallel
           /p:MobileTargetFramework=net8.0-ios
 
-      - name: Publish iOS simulator app
+      - name: Build iOS simulator app
         run: >-
-          dotnet publish Heroes3MapReader.iOS/Heroes3MapReader.iOS.csproj
+          dotnet build Heroes3MapReader.iOS/Heroes3MapReader.iOS.csproj
           --configuration Release
           --framework net8.0-ios
-          --runtime ${{ matrix.runtime }}
+          --runtime ${{ env.IOS_RUNTIME }}
           --no-restore
-          --output artifacts/${{ matrix.artifact_name }}
+          --disable-build-servers
+          -m:1
+          /p:BuildInParallel=false
           /p:MobileTargetFramework=net8.0-ios
           /p:DebugType=None
           /p:DebugSymbols=false
@@ -217,8 +216,8 @@ jobs:
       - name: Upload iOS simulator artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: artifacts/${{ matrix.artifact_name }}
+          name: ${{ env.IOS_ARTIFACT_NAME }}
+          path: Heroes3MapReader.iOS/bin/Release/net8.0-ios/${{ env.IOS_RUNTIME }}
           if-no-files-found: error
 
   publish-android:
@@ -251,6 +250,7 @@ jobs:
         run: >-
           dotnet restore Heroes3MapReader.Android/Heroes3MapReader.Android.csproj
           --runtime ${{ matrix.runtime }}
+          --disable-parallel
           /p:EnableAndroidTargeting=true
 
       - name: Publish Android APK
@@ -260,7 +260,11 @@ jobs:
           --framework net8.0-android34.0
           --runtime ${{ matrix.runtime }}
           --no-restore
+          --disable-build-servers
+          -m:1
           --output artifacts/${{ matrix.artifact_name }}
+          /p:BuildInParallel=false
+          /p:UseSharedCompilation=false
           /p:EnableAndroidTargeting=true
           /p:AndroidPackageFormat=apk
           /p:AndroidKeyStore=false
