@@ -33,10 +33,10 @@ jobs:
           dotnet-version: 8.0.x
 
       - name: Restore dependencies
-        run: dotnet restore Heroes3MapReader.sln
+        run: dotnet restore Heroes3MapReader.sln --disable-parallel
 
       - name: Build solution
-        run: dotnet build Heroes3MapReader.sln --configuration Release --no-restore
+        run: dotnet build Heroes3MapReader.sln --configuration Release --no-restore --disable-build-servers -m:1 /p:BuildInParallel=false
 
       - name: Publish UI folder
         run: >-
@@ -45,7 +45,6 @@ jobs:
           --runtime ${{ matrix.runtime }}
           --self-contained false
           --output artifacts/${{ matrix.artifact_name }}
-          /p:AssemblyName=Heroes3MapReader
           /p:DebugType=portable
           /p:DebugSymbols=true
 
@@ -88,7 +87,6 @@ jobs:
           --self-contained true
           --no-restore
           --output artifacts/${{ matrix.artifact_name }}
-          /p:AssemblyName=Heroes3MapReader
           /p:DebugType=portable
           /p:DebugSymbols=true
 
@@ -130,7 +128,6 @@ jobs:
           --self-contained true
           --no-restore
           --output AppDir/usr/bin
-          /p:AssemblyName=Heroes3MapReader
           /p:DebugType=portable
           /p:DebugSymbols=true
 
@@ -141,14 +138,14 @@ jobs:
           cat > AppDir/AppRun <<'APP_RUN'
           #!/usr/bin/env sh
           HERE="$(dirname "$(readlink -f "$0")")"
-          exec "$HERE/usr/bin/Heroes3MapReader" "$@"
+          exec "$HERE/usr/bin/Heroes3MapReader.UI" "$@"
           APP_RUN
           chmod +x AppDir/AppRun
           cat > AppDir/usr/share/applications/heroes3mapreader.desktop <<'DESKTOP'
           [Desktop Entry]
           Type=Application
           Name=Heroes 3 Map Reader
-          Exec=Heroes3MapReader
+          Exec=Heroes3MapReader.UI
           Icon=heroes3mapreader
           Categories=Game;Utility;
           DESKTOP
@@ -200,6 +197,7 @@ jobs:
         run: >-
           dotnet restore Heroes3MapReader.Android/Heroes3MapReader.Android.csproj
           --runtime ${{ matrix.runtime }}
+          /p:EnableAndroidTargeting=true
 
       - name: Publish Android APK
         run: >-
@@ -209,6 +207,7 @@ jobs:
           --runtime ${{ matrix.runtime }}
           --no-restore
           --output artifacts/${{ matrix.artifact_name }}
+          /p:EnableAndroidTargeting=true
           /p:AndroidPackageFormat=apk
           /p:AndroidKeyStore=false
           /p:DebugType=None
