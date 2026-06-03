@@ -7,6 +7,8 @@ namespace Heroes3MapReader.Logic;
 /// </summary>
 internal static class BinaryReaderExtensions
 {
+    public sealed record DecodedString(string Text, Encoding Encoding, int Score, byte[] Bytes);
+
     static BinaryReaderExtensions()
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
@@ -33,26 +35,52 @@ internal static class BinaryReaderExtensions
             throw new InvalidDataException($"String length too large: {length}");
         }
 
-        byte[] bytes = reader.ReadBytes((int)length);
-        return DecodeString(bytes, encoding);
+        return ReadStringWithDetectedEncoding(reader, encoding, length).Text;
     }
 
-    private static string DecodeString(byte[] bytes, Encoding preferredEncoding)
+    public static DecodedString ReadStringWithDetectedEncoding(BinaryReader reader, Encoding encoding)
+    {
+        uint length = reader.ReadUInt32();
+        return ReadStringWithDetectedEncoding(reader, encoding, length);
+    }
+
+    private static DecodedString ReadStringWithDetectedEncoding(BinaryReader reader, Encoding encoding, uint length)
+    {
+        if (length == 0)
+        {
+            return new DecodedString(string.Empty, encoding, 0, []);
+        }
+
+        if (length > 100000)
+        {
+            throw new InvalidDataException($"String length too large: {length}");
+        }
+
+        byte[] bytes = reader.ReadBytes((int)length);
+        return DetectString(bytes, encoding);
+    }
+
+    public static DecodedString DecodeString(byte[] bytes, Encoding encoding)
+    {
+        string text = encoding.GetString(bytes);
+        return new DecodedString(text, encoding, ScoreDecodedText(text), bytes);
+    }
+
+    private static DecodedString DetectString(byte[] bytes, Encoding preferredEncoding)
     {
         return GetCandidateEncodings(preferredEncoding)
             .Select(encoding => TryDecode(bytes, encoding))
-            .Where(text => text != null)
-            .Select(text => new { Text = text!, Score = ScoreDecodedText(text!) })
-            .OrderByDescending(candidate => candidate.Score)
-            .First()
-            .Text;
+            .Where(candidate => candidate != null)
+            .OrderByDescending(candidate => candidate!.Score)
+            .First()!;
     }
 
-    private static string? TryDecode(byte[] bytes, Encoding encoding)
+    private static DecodedString? TryDecode(byte[] bytes, Encoding encoding)
     {
         try
         {
-            return encoding.GetString(bytes);
+            string text = encoding.GetString(bytes);
+            return new DecodedString(text, encoding, ScoreDecodedText(text), bytes);
         }
         catch (DecoderFallbackException)
         {

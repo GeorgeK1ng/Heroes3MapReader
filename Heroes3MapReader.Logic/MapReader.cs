@@ -78,7 +78,62 @@ public sealed class MapReader : IMapReader
 
         return description
             .Replace(heroesPortalCatalogueText, string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace("This map is taken from the catalogue heroesportal.net", string.Empty, StringComparison.OrdinalIgnoreCase)
             .Trim();
+    }
+
+    private static string DecodeNameWithDescriptionEncoding(
+        BinaryReaderExtensions.DecodedString name,
+        BinaryReaderExtensions.DecodedString description)
+    {
+        if (name.Bytes.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        if (description.Bytes.Length == 0 || name.Encoding.CodePage == description.Encoding.CodePage)
+        {
+            return name.Text;
+        }
+
+        string descriptionEncodingName = BinaryReaderExtensions.DecodeString(name.Bytes, description.Encoding).Text;
+        return LooksLikeBetterMapName(descriptionEncodingName, name.Text) ? descriptionEncodingName : name.Text;
+    }
+
+    private static bool LooksLikeBetterMapName(string candidate, string current)
+    {
+        return ScoreMapName(candidate) > ScoreMapName(current);
+    }
+
+    private static int ScoreMapName(string value)
+    {
+        int score = 0;
+        foreach (char character in value)
+        {
+            if (character == '\uFFFD')
+            {
+                score -= 100;
+            }
+            else if (char.IsControl(character) && !char.IsWhiteSpace(character))
+            {
+                score -= 50;
+            }
+            else if (char.IsLetterOrDigit(character))
+            {
+                score += 2;
+            }
+            else if (char.IsWhiteSpace(character) || char.IsPunctuation(character))
+            {
+                score += 1;
+            }
+
+            if ("áčďéěíňóřšťúůýžÁČĎÉĚÍŇÓŘŠŤÚŮÝŽąćęłńóśźżĄĆĘŁŃÓŚŹŻőűŐŰàâæçèéêëîïôœùûüÿÀÂÆÇÈÉÊËÎÏÔŒÙÛÜŸäöüßÄÖÜẞåÅ".Contains(character))
+            {
+                score += 8;
+            }
+        }
+
+        return score;
     }
 
     private MapInfo ParseMap(BinaryReader reader, bool readTerrain)
@@ -108,8 +163,10 @@ public sealed class MapReader : IMapReader
         mapInfo.Height = (int)size;
         mapInfo.Size = ParseMapSize((int)size);
         mapInfo.HasUnderground = reader.ReadBoolean();
-        mapInfo.Name = BinaryReaderExtensions.ReadString(reader, _encoding);
-        mapInfo.Description = NormalizeDescription(BinaryReaderExtensions.ReadString(reader, _encoding));
+        BinaryReaderExtensions.DecodedString decodedName = BinaryReaderExtensions.ReadStringWithDetectedEncoding(reader, _encoding);
+        BinaryReaderExtensions.DecodedString decodedDescription = BinaryReaderExtensions.ReadStringWithDetectedEncoding(reader, _encoding);
+        mapInfo.Name = DecodeNameWithDescriptionEncoding(decodedName, decodedDescription);
+        mapInfo.Description = NormalizeDescription(decodedDescription.Text);
         DetectedLanguage descriptionLanguage = MapLanguageDetector.Detect(mapInfo.Description);
         mapInfo.DescriptionLanguageCode = descriptionLanguage.Code;
         mapInfo.DescriptionLanguageName = descriptionLanguage.Name;
