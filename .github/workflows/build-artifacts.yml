@@ -144,14 +144,14 @@ jobs:
           cat > AppDir/AppRun <<'APP_RUN'
           #!/usr/bin/env sh
           HERE="$(dirname "$(readlink -f "$0")")"
-          exec "$HERE/usr/bin/Heroes3MapReader.UI" "$@"
+          exec "$HERE/usr/bin/Heroes3MapReader" "$@"
           APP_RUN
           chmod +x AppDir/AppRun
           cat > AppDir/usr/share/applications/heroes3mapreader.desktop <<'DESKTOP'
           [Desktop Entry]
           Type=Application
           Name=Heroes 3 Map Reader
-          Exec=Heroes3MapReader.UI
+          Exec=Heroes3MapReader
           Icon=heroes3mapreader
           Categories=Game;Utility;
           DESKTOP

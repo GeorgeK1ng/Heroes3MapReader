@@ -7,8 +7,8 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <ApplicationId>com.cactuspie.heroes3mapreader</ApplicationId>
         <ApplicationTitle>Heroes 3 Map Reader</ApplicationTitle>
-        <ApplicationVersion>1</ApplicationVersion>
-        <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+        <ApplicationVersion>7</ApplicationVersion>
+        <ApplicationDisplayVersion>1.7.0</ApplicationDisplayVersion>
     </PropertyGroup>
 
     <ItemGroup>

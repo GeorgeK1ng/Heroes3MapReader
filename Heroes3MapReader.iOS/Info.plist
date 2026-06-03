@@ -9,9 +9,9 @@
     <key>CFBundleName</key>
     <string>Heroes 3 Map Reader</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>7</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
+    <string>1.7.0</string>
     <key>MinimumOSVersion</key>
     <string>13.0</string>
     <key>UIDeviceFamily</key>
