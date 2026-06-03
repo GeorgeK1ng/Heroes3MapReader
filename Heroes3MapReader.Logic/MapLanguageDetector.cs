@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Reflection;
+using System.Text;
 using Heroes3MapReader.Logic.Models;
 using NTextCat;
 
@@ -27,12 +28,12 @@ public static class MapLanguageDetector
 
     private static readonly Dictionary<string, HashSet<string>> LatinFallbackWords = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["czech"] = new(StringComparer.OrdinalIgnoreCase) { "aztekove", "byt", "byl", "byla", "den", "dva", "jejich", "jsou", "mapa", "mayove", "narody", "neprateli", "nezavislosti", "nyni", "ohrozovani", "pekelniky", "pro", "silami", "starymi", "vybojujte", "zamek" },
+        ["czech"] = new(StringComparer.OrdinalIgnoreCase) { "aztekove", "byt", "byl", "byla", "cesky", "cesta", "den", "dva", "hrad", "jejich", "jsou", "kral", "mapa", "mayove", "mesto", "musis", "narody", "neprateli", "nezavislosti", "nyni", "ohrozovani", "pekelniky", "poraz", "pro", "proti", "silami", "starymi", "tvuj", "ukol", "vybojujte", "zamek", "zeme" },
         ["english"] = new(StringComparer.OrdinalIgnoreCase) { "after", "against", "all", "and", "army", "battle", "castle", "defeat", "enemy", "find", "for", "hero", "king", "map", "must", "the", "this", "town", "war", "with", "you", "your" },
-        ["polish"] = new(StringComparer.OrdinalIgnoreCase) { "armia", "bitwa", "bohater", "dla", "dwa", "jest", "kraina", "krol", "krolestwo", "mapa", "miasto", "musisz", "nie", "pokonaj", "przeciw", "skarbu", "twoj", "twoja", "wojna", "zamek", "znajdz" },
+        ["polish"] = new(StringComparer.OrdinalIgnoreCase) { "armia", "bitwa", "bohater", "dla", "dwa", "jest", "kraina", "krol", "krolestwo", "mapa", "miasto", "musisz", "nie", "pokonaj", "polski", "przeciw", "skarbu", "twoj", "twoja", "wojna", "zamek", "ziemia", "znajdz" },
         ["german"] = new(StringComparer.OrdinalIgnoreCase) { "alle", "auf", "burg", "dein", "der", "die", "ein", "feind", "finde", "gegen", "held", "karte", "koenig", "konig", "land", "mit", "musst", "stadt", "und" },
-        ["french"] = new(StringComparer.OrdinalIgnoreCase) { "avec", "carte", "chateau", "contre", "dans", "des", "ennemi", "heros", "les", "pour", "que", "quete", "roi", "royaume", "sur", "terre", "trouver", "une", "vous", "votre" },
-        ["hungarian"] = new(StringComparer.OrdinalIgnoreCase) { "arany", "az", "csak", "ellenseg", "es", "feladat", "fold", "hos", "kell", "keresd", "kiraly", "kincs", "terkep", "var", "varos" },
+        ["french"] = new(StringComparer.OrdinalIgnoreCase) { "avec", "carte", "chateau", "contre", "dans", "des", "doit", "ennemi", "est", "etre", "francais", "heros", "les", "pour", "que", "quete", "roi", "royaume", "sur", "terre", "trouver", "une", "vous", "votre" },
+        ["hungarian"] = new(StringComparer.OrdinalIgnoreCase) { "arany", "az", "csak", "ellenseg", "ellen", "es", "feladat", "fold", "hos", "kell", "keresd", "kiraly", "kincs", "magyar", "meg", "terkep", "var", "varos", "vagy" },
         ["swedish"] = new(StringComparer.OrdinalIgnoreCase) { "alla", "borg", "den", "det", "din", "du", "efter", "fiende", "hitta", "hjalte", "karta", "kung", "land", "maste", "med", "mot", "och", "skatt", "stad" },
         ["spanish"] = new(StringComparer.OrdinalIgnoreCase) { "castillo", "contra", "debes", "derrota", "el", "enemigo", "encontrar", "guerra", "heroe", "mapa", "para", "reino", "tesoro", "tierra", "tu" },
         ["italian"] = new(StringComparer.OrdinalIgnoreCase) { "castello", "contro", "devi", "eroe", "guerra", "il", "mappa", "nemico", "per", "regno", "terra", "tesoro", "trova", "tuo" },
@@ -50,6 +51,12 @@ public static class MapLanguageDetector
         if (string.IsNullOrWhiteSpace(description))
         {
             return DetectedLanguage.Unknown;
+        }
+
+        DetectedLanguage? strongLatinFallback = DetectLatinFallback(description, requireStrongEvidence: true);
+        if (strongLatinFallback != null)
+        {
+            return strongLatinFallback;
         }
 
         RankedLanguageIdentifier? identifier = LanguageIdentifier.Value;
@@ -180,7 +187,7 @@ public static class MapLanguageDetector
         return DetectedLanguage.Unknown;
     }
 
-    private static DetectedLanguage? DetectLatinFallback(string description)
+    private static DetectedLanguage? DetectLatinFallback(string description, bool requireStrongEvidence = false)
     {
         string[] words = description
             .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -195,17 +202,17 @@ public static class MapLanguageDetector
 
         foreach (char character in description)
         {
-            if ("áčďéěíňóřšťúůýžÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ".Contains(character))
+            if ("čďěňřšťůžČĎĚŇŘŠŤŮŽ".Contains(character))
             {
                 scores["czech"] += 3;
             }
-            else if ("ąćęłńóśźżĄĆĘŁŃÓŚŹŻ".Contains(character))
+            else if ("ąćęłńśźżĄĆĘŁŃŚŹŻ".Contains(character))
             {
-                scores["polish"] += 3;
+                scores["polish"] += 4;
             }
             else if ("őűŐŰ".Contains(character))
             {
-                scores["hungarian"] += 3;
+                scores["hungarian"] += 4;
             }
             else if ("åÅ".Contains(character))
             {
@@ -216,14 +223,42 @@ public static class MapLanguageDetector
                 scores["german"] += 2;
                 scores["swedish"] += 1;
             }
-            else if ("àâæçèêëîïôœùûüÿÀÂÆÇÈÊËÎÏÔŒÙÛÜŸ".Contains(character))
+            else if ("àâæçèéêëîïôœùûüÿÀÂÆÇÈÉÊËÎÏÔŒÙÛÜŸ".Contains(character))
             {
                 scores["french"] += 2;
             }
         }
 
         KeyValuePair<string, int> bestScore = scores.MaxBy(pair => pair.Value);
-        return bestScore.Value >= 2 ? LatinFallbackLanguages[bestScore.Key] : null;
+        if (bestScore.Value < 2)
+        {
+            return null;
+        }
+
+        if (requireStrongEvidence)
+        {
+            int secondBestScore = scores
+                .Where(pair => !string.Equals(pair.Key, bestScore.Key, StringComparison.OrdinalIgnoreCase))
+                .Max(pair => pair.Value);
+
+            bool hasLanguageSpecificCharacters = bestScore.Key switch
+            {
+                "czech" => description.Any(character => "čďěňřšťůžČĎĚŇŘŠŤŮŽ".Contains(character)),
+                "polish" => description.Any(character => "ąćęłńśźżĄĆĘŁŃŚŹŻ".Contains(character)),
+                "hungarian" => description.Any(character => "őűŐŰ".Contains(character)),
+                "french" => description.Any(character => "àâæçèêëîïôœùûüÿÀÂÆÇÈÊËÎÏÔŒÙÛÜŸ".Contains(character)),
+                "german" => description.Any(character => "ßẞ".Contains(character)),
+                "swedish" => description.Any(character => "åÅ".Contains(character)),
+                _ => false,
+            };
+
+            if (!hasLanguageSpecificCharacters && bestScore.Value < secondBestScore + 2)
+            {
+                return null;
+            }
+        }
+
+        return LatinFallbackLanguages[bestScore.Key];
     }
 
     private static string NormalizeLanguageCode(string? languageCode)
@@ -306,7 +341,13 @@ public static class MapLanguageDetector
 
     private static string NormalizeWord(string word)
     {
-        return new string(word.Where(char.IsLetter).Select(char.ToLowerInvariant).ToArray());
+        string lettersOnly = new(word.Where(char.IsLetter).ToArray());
+        string normalized = lettersOnly.Normalize(NormalizationForm.FormD);
+
+        return new string(normalized
+            .Where(character => CharUnicodeInfo.GetUnicodeCategory(character) != UnicodeCategory.NonSpacingMark)
+            .Select(char.ToLowerInvariant)
+            .ToArray());
     }
 
     private static bool IsCjk(char character)

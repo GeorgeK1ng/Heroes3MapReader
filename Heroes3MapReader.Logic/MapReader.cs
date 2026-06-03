@@ -67,6 +67,20 @@ public sealed class MapReader : IMapReader
         }
     }
 
+    private static string NormalizeDescription(string description)
+    {
+        const string heroesPortalCatalogueText = "This map is taken from the catalogue www.heroesportal.net";
+
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            return string.Empty;
+        }
+
+        return description
+            .Replace(heroesPortalCatalogueText, string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Trim();
+    }
+
     private MapInfo ParseMap(BinaryReader reader, bool readTerrain)
     {
         var mapInfo = new MapInfo();
@@ -95,7 +109,7 @@ public sealed class MapReader : IMapReader
         mapInfo.Size = ParseMapSize((int)size);
         mapInfo.HasUnderground = reader.ReadBoolean();
         mapInfo.Name = BinaryReaderExtensions.ReadString(reader, _encoding);
-        mapInfo.Description = BinaryReaderExtensions.ReadString(reader, _encoding);
+        mapInfo.Description = NormalizeDescription(BinaryReaderExtensions.ReadString(reader, _encoding));
         DetectedLanguage descriptionLanguage = MapLanguageDetector.Detect(mapInfo.Description);
         mapInfo.DescriptionLanguageCode = descriptionLanguage.Code;
         mapInfo.DescriptionLanguageName = descriptionLanguage.Name;
