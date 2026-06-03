@@ -90,7 +90,7 @@ jobs:
         run: >-
           dotnet publish Heroes3MapReader.Android/Heroes3MapReader.Android.csproj
           --configuration Release
-          --framework net8.0-android
+          --framework net8.0-android34.0
           --runtime ${{ matrix.runtime }}
           --no-restore
           --output artifacts/${{ matrix.artifact_name }}
