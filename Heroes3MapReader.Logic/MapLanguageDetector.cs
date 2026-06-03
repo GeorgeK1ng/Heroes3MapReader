@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Reflection;
 using Heroes3MapReader.Logic.Models;
-using IvanAkcheurov.NTextCat.Lib;
+using NTextCat;
 
 namespace Heroes3MapReader.Logic;
 
