@@ -2,8 +2,9 @@
 
     <PropertyGroup>
         <TargetFramework Condition="'$(MobileTargetFramework)' != ''">$(MobileTargetFramework)</TargetFramework>
-        <TargetFramework Condition="'$(MobileTargetFramework)' == '' And '$(EnableAndroidTargeting)' == 'true'">net8.0-android34.0</TargetFramework>
-        <TargetFramework Condition="'$(MobileTargetFramework)' == '' And '$(EnableAndroidTargeting)' != 'true'">net8.0</TargetFramework>
+        <TargetFramework Condition="'$(MobileTargetFramework)' == '' And '$(DesktopTargetFramework)' != ''">$(DesktopTargetFramework)</TargetFramework>
+        <TargetFramework Condition="'$(MobileTargetFramework)' == '' And '$(DesktopTargetFramework)' == '' And '$(EnableAndroidTargeting)' == 'true'">net8.0-android34.0</TargetFramework>
+        <TargetFramework Condition="'$(MobileTargetFramework)' == '' And '$(DesktopTargetFramework)' == '' And '$(EnableAndroidTargeting)' != 'true'">net8.0</TargetFramework>
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>

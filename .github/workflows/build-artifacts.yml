@@ -30,7 +30,9 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: |
+            8.0.x
+            6.0.x
 
       - name: Restore dependencies
         run: dotnet restore Heroes3MapReader.sln --disable-parallel
@@ -38,13 +40,15 @@ jobs:
       - name: Build solution
         run: dotnet build Heroes3MapReader.sln --configuration Release --no-restore --disable-build-servers -m:1 /p:BuildInParallel=false
 
-      - name: Publish UI folder
+      - name: Publish Windows 7-compatible UI folder
         run: >-
           dotnet publish Heroes3MapReader.UI/Heroes3MapReader.UI.csproj
           --configuration Release
+          --framework net6.0-windows7.0
           --runtime ${{ matrix.runtime }}
-          --self-contained false
+          --self-contained true
           --output artifacts/${{ matrix.artifact_name }}
+          /p:DesktopTargetFramework=net6.0-windows7.0
           /p:DebugType=portable
           /p:DebugSymbols=true
 
