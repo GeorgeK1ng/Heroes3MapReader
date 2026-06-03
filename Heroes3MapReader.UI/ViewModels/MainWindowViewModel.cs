@@ -54,7 +54,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool? _selectedHasUnderground;
 
     [ObservableProperty]
-    private MapLanguage? _selectedDescriptionLanguage;
+    private string? _selectedDescriptionLanguage;
 
     [ObservableProperty]
     private bool _hideDuplicates;
@@ -88,6 +88,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public ObservableCollection<FactionFilterItemViewModel> FactionFilters { get; } = [];
     public ObservableCollection<SpellFilterItemViewModel> SpellFilters { get; } = [];
     public ObservableCollection<MapSizeFilterItemViewModel> MapSizeFilters { get; } = [];
+    public ObservableCollection<string?> MapLanguages { get; } = [null];
 
     private readonly List<MapItemViewModel> _allMaps = [];
     private readonly List<MapItemViewModel> _selectedMaps = [];
@@ -114,7 +115,6 @@ public partial class MainWindowViewModel : ViewModelBase
         Difficulties = Enum.GetValues<MapDifficulty>().Cast<MapDifficulty?>().Prepend(null).ToList();
         VictoryConditions = Enum.GetValues<VictoryConditionType>().Cast<VictoryConditionType?>().Prepend(null).ToList();
         MapFormats = Enum.GetValues<MapFormat>().Cast<MapFormat?>().Prepend(null).ToList();
-        MapLanguages = Enum.GetValues<MapLanguage>().Cast<MapLanguage?>().Prepend(null).ToList();
 
         foreach (FactionType faction in Enum.GetValues<FactionType>())
         {
@@ -173,7 +173,6 @@ public partial class MainWindowViewModel : ViewModelBase
     public List<MapDifficulty?> Difficulties { get; }
     public List<VictoryConditionType?> VictoryConditions { get; }
     public List<MapFormat?> MapFormats { get; }
-    public List<MapLanguage?> MapLanguages { get; }
     public List<bool?> HasUndergroundOptions { get; } = [null, true, false];
 
     public bool CanLoadMaps => !string.IsNullOrWhiteSpace(DirectoryPath) && !IsLoading;
@@ -209,7 +208,7 @@ public partial class MainWindowViewModel : ViewModelBase
         ApplyFiltersAndSort();
     }
 
-    partial void OnSelectedDescriptionLanguageChanged(MapLanguage? value)
+    partial void OnSelectedDescriptionLanguageChanged(string? value)
     {
         ApplyFiltersAndSort();
     }
@@ -341,6 +340,7 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusMessage = "Scanning for maps...";
         _allMaps.Clear();
         SetSelectedMaps([]);
+        ResetMapLanguageOptions();
         FilteredMaps = [];
 
         try
@@ -372,6 +372,7 @@ public partial class MainWindowViewModel : ViewModelBase
                         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                         {
                             _allMaps.Add(mapViewModel);
+                            AddMapLanguageOption(mapInfo.DescriptionLanguageName);
                             loadedCount++;
                             StatusMessage = $"Loading maps... {loadedCount + failedCount}/{totalFiles}";
                         });
@@ -460,7 +461,7 @@ public partial class MainWindowViewModel : ViewModelBase
         VictoryConditionType? selectedVictoryCondition = SelectedVictoryCondition;
         MapFormat? selectedFormat = SelectedFormat;
         bool? selectedHasUnderground = SelectedHasUnderground;
-        MapLanguage? selectedDescriptionLanguage = SelectedDescriptionLanguage;
+        string? selectedDescriptionLanguage = SelectedDescriptionLanguage;
         bool hideDuplicates = HideDuplicates;
         List<FactionType> selectedFactions = FactionFilters.Where(f => f.IsSelected).Select(f => f.Faction).ToList();
         List<SpellType> selectedSpells = SpellFilters.Where(f => f.IsSelected).Select(f => f.Spell).ToList();
@@ -507,9 +508,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 filtered = filtered.Where(m => m.Map.HasUnderground == selectedHasUnderground.Value);
             }
 
-            if (selectedDescriptionLanguage.HasValue)
+            if (!string.IsNullOrWhiteSpace(selectedDescriptionLanguage))
             {
-                filtered = filtered.Where(m => m.Map.DescriptionLanguage == selectedDescriptionLanguage.Value);
+                filtered = filtered.Where(m => string.Equals(m.Map.DescriptionLanguageName, selectedDescriptionLanguage, StringComparison.OrdinalIgnoreCase));
             }
 
             if (selectedFactions.Count > 0)
@@ -677,6 +678,28 @@ public partial class MainWindowViewModel : ViewModelBase
         SelectedSpellCount = SpellFilters.Count(f => f.IsSelected);
     }
 
+    private void ResetMapLanguageOptions()
+    {
+        MapLanguages.Clear();
+        MapLanguages.Add(null);
+        SelectedDescriptionLanguage = null;
+    }
+
+    private void AddMapLanguageOption(string languageName)
+    {
+        if (string.IsNullOrWhiteSpace(languageName) || MapLanguages.Any(language => string.Equals(language, languageName, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        int insertIndex = MapLanguages
+            .Skip(1)
+            .TakeWhile(language => string.Compare(language, languageName, StringComparison.OrdinalIgnoreCase) < 0)
+            .Count() + 1;
+
+        MapLanguages.Insert(insertIndex, languageName);
+    }
+
     private static int ExportMaps(IEnumerable<MapItemViewModel> mapsToExport, string exportRoot)
     {
         Directory.CreateDirectory(exportRoot);
@@ -684,7 +707,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var exportedCount = 0;
         foreach (MapItemViewModel map in mapsToExport)
         {
-            string languageDirectory = Path.Combine(exportRoot, GetLanguageFolderName(map.Map.DescriptionLanguage));
+            string languageDirectory = Path.Combine(exportRoot, GetLanguageFolderName(map.Map.DescriptionLanguageName));
             Directory.CreateDirectory(languageDirectory);
 
             string extension = Path.GetExtension(map.FilePath);
@@ -714,9 +737,9 @@ public partial class MainWindowViewModel : ViewModelBase
         };
     }
 
-    private static string GetLanguageFolderName(MapLanguage language)
+    private static string GetLanguageFolderName(string? languageName)
     {
-        return language.ToString();
+        return SanitizeFileName(string.IsNullOrWhiteSpace(languageName) ? "Unknown" : languageName);
     }
 
     private static string SanitizeFileName(string fileName)

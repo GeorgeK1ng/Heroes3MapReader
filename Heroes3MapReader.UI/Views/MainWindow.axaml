@@ -274,7 +274,7 @@
                                             Binding="{Binding Map.Difficulty}"
                                             Width="100"/>
                         <DataGridTextColumn Header="Language"
-                                            Binding="{Binding Map.DescriptionLanguage}"
+                                            Binding="{Binding Map.DescriptionLanguageName}"
                                             Width="100"/>
                         <DataGridTextColumn Header="Victory"
                                             Binding="{Binding Map.VictoryCondition.Type, Converter={StaticResource VictoryConditionConverter}, Mode=OneWay}"
@@ -416,7 +416,7 @@
                                         <TextBlock Grid.Row="5" Grid.Column="2" Text="{Binding SelectedMap.Map.HasUnderground}" Margin="0,0,0,5"/>
 
                                         <TextBlock Grid.Row="6" Grid.Column="0" Text="Language:" FontWeight="Medium" Margin="0,0,0,5"/>
-                                        <TextBlock Grid.Row="6" Grid.Column="2" Text="{Binding SelectedMap.Map.DescriptionLanguage}" Margin="0,0,0,5"/>
+                                        <TextBlock Grid.Row="6" Grid.Column="2" Text="{Binding SelectedMap.Map.DescriptionLanguageName}" Margin="0,0,0,5"/>
 
                                         <TextBlock Grid.Row="7" Grid.Column="0" Text="File Path:" FontWeight="Medium" Margin="0,0,0,5"/>
                                         <TextBox Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="3"

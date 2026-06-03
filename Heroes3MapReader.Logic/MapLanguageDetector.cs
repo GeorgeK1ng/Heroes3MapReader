@@ -1,81 +1,104 @@
-using Heroes3MapReader.Logic.Models.Enums;
+using System.Globalization;
+using System.Reflection;
+using Heroes3MapReader.Logic.Models;
+using IvanAkcheurov.NTextCat.Lib;
 
 namespace Heroes3MapReader.Logic;
 
 /// <summary>
-/// Detects the most likely language of map descriptions using lightweight script and keyword heuristics.
+/// Detects the most likely language of map descriptions using NTextCat language models.
 /// </summary>
 public static class MapLanguageDetector
 {
-    private static readonly HashSet<string> CzechWords = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "ahoj", "bez", "bude", "budou", "byt", "byl", "byla", "byli", "cesta", "ceska", "ceske", "cesky",
-        "dal", "dalsi", "den", "dobyt", "hrad", "hradu", "hradem", "hrady", "hraje", "hrac", "hraci", "hracu",
-        "jednou", "jses", "jsi", "jsou", "kral", "krale", "kralovstvi", "ktery", "ktera", "ktere", "mapa", "mesto", "mesta",
-        "musis", "muzete", "najdi", "najit", "nepritel", "nepritele", "nepratelske", "ostrov", "poklad", "poraz", "porazit",
-        "pro", "proti", "pred", "pres", "pribeh", "sever", "spojenec", "tvoje", "tvoji", "tvuj", "vase", "vasich", "vyhrat",
-        "vitezstvi", "vojsku", "zachran", "zeme", "ziskej", "ziskat", "zlo", "znovu", "zustal", "uzemi", "ukol", "utok", "zamek", "zamku",
-    };
+    private const string UnknownLanguageCode = "und";
 
-    private static readonly HashSet<string> EnglishWords = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "after", "against", "all", "allies", "army", "battle", "before", "castle", "defeat", "enemy", "find", "for", "gold",
-        "hero", "king", "kingdom", "land", "lands", "lord", "map", "must", "only", "player", "players", "quest", "the", "this", "town", "treasure",
-        "two", "victory", "war", "will", "with", "you", "your",
-    };
-
-    private static readonly HashSet<string> GermanWords = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "alle", "auf", "burg", "dein", "deine", "dem", "den", "der", "des", "die", "dies", "diese", "dorf", "ein", "eine",
-        "feind", "feinde", "finde", "gegen", "gold", "held", "karte", "koenig", "konig", "koenigreich", "konigreich", "land",
-        "mit", "musst", "nach", "nur", "reich", "schatz", "stadt", "und", "von", "vor", "wird", "zu",
-    };
-
-    private static readonly HashSet<string> FrenchWords = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "apres", "avec", "avant", "carte", "chateau", "contre", "dans", "des", "doit", "ennemi", "ennemis", "est", "etre",
-        "heros", "les", "monde", "or", "pour", "que", "quete", "roi", "royaume", "sur", "terre", "tes", "toi", "ton", "tresor", "trouver", "une", "vous", "votre",
-    };
-
-    private static readonly HashSet<string> UkrainianWords = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "але", "битва", "вiйна", "війна", "вiн", "він", "вона", "вони", "ворог", "вороги", "герой", "герої", "знайди", "замок", "земля",
-        "карта", "король", "королiвство", "королівство", "мiсто", "місто", "повинен", "проти", "скарб", "твiй", "твій", "твоя", "твоє", "треба", "усi", "усі", "царство",
-    };
-
-    private static readonly HashSet<string> RussianWords = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "битва", "враг", "враги", "все", "герой", "герои", "город", "должен", "замок", "земля", "карта", "король",
-        "королевство", "найди", "против", "сокровище", "твой", "твоя", "твое", "царь", "царство",
-    };
-
-    private static readonly HashSet<string> HungarianWords = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "arany", "az", "csak", "ellenseg", "ellen", "es", "feladat", "fold", "hos", "hosok", "kell", "keresd", "kiraly", "kiralysag",
-        "kincs", "kuzdelem", "meg", "minden", "terkep", "var", "varos", "vagy", "vilag",
-    };
-
-    private static readonly HashSet<string> SwedishWords = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "alla", "armé", "arme", "borg", "den", "det", "din", "dina", "dit", "du", "efter", "fiende", "fiender", "före", "fore", "guld",
-        "hitta", "hjälte", "hjalte", "karta", "kung", "kungarike", "land", "måste", "maste", "med", "mot", "och", "skatt", "stad", "strid",
-    };
+    private static readonly Lazy<RankedLanguageIdentifier?> LanguageIdentifier = new(LoadLanguageIdentifier);
 
     /// <summary>
     /// Detects the most likely language from a map description.
     /// </summary>
     /// <param name="description">The map description text.</param>
     /// <returns>The best-effort detected language.</returns>
-    public static MapLanguage Detect(string? description)
+    public static DetectedLanguage Detect(string? description)
     {
         if (string.IsNullOrWhiteSpace(description))
         {
-            return MapLanguage.Unknown;
+            return DetectedLanguage.Unknown;
         }
 
+        RankedLanguageIdentifier? identifier = LanguageIdentifier.Value;
+        if (identifier == null)
+        {
+            return DetectByScriptFallback(description);
+        }
+
+        var mostCertainLanguage = identifier
+            .Identify(description)
+            .FirstOrDefault();
+
+        if (mostCertainLanguage == null)
+        {
+            return DetectByScriptFallback(description);
+        }
+
+        string languageCode = NormalizeLanguageCode(mostCertainLanguage.Item1.Iso639_3);
+        if (languageCode == UnknownLanguageCode)
+        {
+            return DetectByScriptFallback(description);
+        }
+
+        return new DetectedLanguage(languageCode, GetLanguageName(languageCode));
+    }
+
+    private static RankedLanguageIdentifier? LoadLanguageIdentifier()
+    {
+        var factory = new RankedLanguageIdentifierFactory();
+
+        foreach (string profilePath in GetLanguageModelPaths())
+        {
+            if (File.Exists(profilePath))
+            {
+                return factory.Load(profilePath);
+            }
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<string> GetLanguageModelPaths()
+    {
+        string? assemblyDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+        string[] baseDirectories = new[]
+            {
+                AppContext.BaseDirectory,
+                assemblyDirectory,
+            }
+            .Where(directory => !string.IsNullOrWhiteSpace(directory))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Cast<string>()
+            .ToArray();
+
+        string[] modelFileNames =
+        {
+            "Wikipedia82.profile.xml",
+            "Wiki82.profile.xml",
+            "Core14.profile.xml",
+        };
+
+        foreach (string baseDirectory in baseDirectories)
+        {
+            foreach (string modelFileName in modelFileNames)
+            {
+                yield return Path.Combine(baseDirectory, "LanguageModels", modelFileName);
+                yield return Path.Combine(baseDirectory, modelFileName);
+            }
+        }
+    }
+
+    private static DetectedLanguage DetectByScriptFallback(string description)
+    {
         int cjkCount = 0;
         int cyrillicCount = 0;
-        int latinCount = 0;
         int letterCount = 0;
 
         foreach (char character in description)
@@ -93,104 +116,77 @@ public static class MapLanguageDetector
             {
                 cyrillicCount++;
             }
-            else if (IsBasicLatinOrLatinExtended(character))
-            {
-                latinCount++;
-            }
         }
 
         if (letterCount == 0)
         {
-            return MapLanguage.Unknown;
+            return DetectedLanguage.Unknown;
         }
 
         if (cjkCount >= 2 && cjkCount >= letterCount * 0.15)
         {
-            return MapLanguage.Chinese;
+            return new DetectedLanguage("zho", "Chinese");
         }
-
-        string[] words = description
-            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(NormalizeWord)
-            .Where(word => word.Length > 1)
-            .ToArray();
 
         if (cyrillicCount >= 3 && cyrillicCount >= letterCount * 0.2)
         {
-            return DetectCyrillicLanguage(description, words);
+            return description.Any(IsUkrainianSpecificCyrillic)
+                ? new DetectedLanguage("ukr", "Ukrainian")
+                : new DetectedLanguage("rus", "Russian");
         }
 
-        if (latinCount == 0)
-        {
-            return MapLanguage.Other;
-        }
-
-        Dictionary<MapLanguage, int> scores = GetLatinLanguageScores(description, words);
-        KeyValuePair<MapLanguage, int> bestScore = scores.MaxBy(score => score.Value);
-
-        if (bestScore.Value >= 2)
-        {
-            return bestScore.Key;
-        }
-
-        return MapLanguage.Other;
+        return DetectedLanguage.Unknown;
     }
 
-    private static MapLanguage DetectCyrillicLanguage(string description, string[] words)
+    private static string NormalizeLanguageCode(string? languageCode)
     {
-        int ukrainianScore = words.Count(UkrainianWords.Contains);
-        int russianScore = words.Count(RussianWords.Contains);
-
-        if (description.Any(IsUkrainianSpecificCyrillic))
+        if (string.IsNullOrWhiteSpace(languageCode))
         {
-            ukrainianScore += 2;
+            return UnknownLanguageCode;
         }
 
-        if (ukrainianScore >= 2 && ukrainianScore >= russianScore)
+        return languageCode.Trim().ToLowerInvariant() switch
         {
-            return MapLanguage.Ukrainian;
-        }
-
-        return MapLanguage.Russian;
+            "chi" => "zho",
+            "cze" => "ces",
+            "fre" => "fra",
+            "ger" => "deu",
+            "gre" => "ell",
+            "per" => "fas",
+            "rum" => "ron",
+            "slo" => "slk",
+            _ => languageCode.Trim().ToLowerInvariant(),
+        };
     }
 
-    private static Dictionary<MapLanguage, int> GetLatinLanguageScores(string description, string[] words)
+    private static string GetLanguageName(string languageCode)
     {
-        var scores = new Dictionary<MapLanguage, int>
+        string knownLanguageName = languageCode switch
         {
-            [MapLanguage.Czech] = words.Count(CzechWords.Contains),
-            [MapLanguage.English] = words.Count(EnglishWords.Contains),
-            [MapLanguage.German] = words.Count(GermanWords.Contains),
-            [MapLanguage.French] = words.Count(FrenchWords.Contains),
-            [MapLanguage.Hungarian] = words.Count(HungarianWords.Contains),
-            [MapLanguage.Swedish] = words.Count(SwedishWords.Contains),
+            "ces" => "Czech",
+            "deu" => "German",
+            "eng" => "English",
+            "fra" => "French",
+            "hun" => "Hungarian",
+            "pol" => "Polish",
+            "rus" => "Russian",
+            "swe" => "Swedish",
+            "ukr" => "Ukrainian",
+            "zho" => "Chinese",
+            UnknownLanguageCode => "Unknown",
+            _ => string.Empty,
         };
 
-        foreach (char character in description)
+        if (!string.IsNullOrEmpty(knownLanguageName))
         {
-            if (IsCzechSpecificLatin(character))
-            {
-                scores[MapLanguage.Czech] += 2;
-            }
-            else if (IsGermanSpecificLatin(character))
-            {
-                scores[MapLanguage.German] += 2;
-            }
-            else if (IsFrenchSpecificLatin(character))
-            {
-                scores[MapLanguage.French] += 2;
-            }
-            else if (IsHungarianSpecificLatin(character))
-            {
-                scores[MapLanguage.Hungarian] += 2;
-            }
-            else if (IsSwedishSpecificLatin(character))
-            {
-                scores[MapLanguage.Swedish] += 2;
-            }
+            return knownLanguageName;
         }
 
-        return scores;
+        CultureInfo? culture = CultureInfo
+            .GetCultures(CultureTypes.NeutralCultures)
+            .FirstOrDefault(culture => string.Equals(culture.ThreeLetterISOLanguageName, languageCode, StringComparison.OrdinalIgnoreCase));
+
+        return culture?.EnglishName ?? languageCode;
     }
 
     private static bool IsCjk(char character)
@@ -207,45 +203,8 @@ public static class MapLanguageDetector
             or >= '\uA640' and <= '\uA69F';
     }
 
-    private static bool IsBasicLatinOrLatinExtended(char character)
-    {
-        return character is >= 'A' and <= 'Z'
-            or >= 'a' and <= 'z'
-            or >= '\u00C0' and <= '\u024F';
-    }
-
     private static bool IsUkrainianSpecificCyrillic(char character)
     {
         return "іІїЇєЄґҐ".Contains(character);
-    }
-
-    private static bool IsCzechSpecificLatin(char character)
-    {
-        return "čďěňřšťůžČĎĚŇŘŠŤŮŽ".Contains(character);
-    }
-
-    private static bool IsGermanSpecificLatin(char character)
-    {
-        return "ßẞ".Contains(character);
-    }
-
-    private static bool IsFrenchSpecificLatin(char character)
-    {
-        return "àâæçèêëîïôœùûüÿÀÂÆÇÈÊËÎÏÔŒÙÛÜŸ".Contains(character);
-    }
-
-    private static bool IsHungarianSpecificLatin(char character)
-    {
-        return "őűŐŰ".Contains(character);
-    }
-
-    private static bool IsSwedishSpecificLatin(char character)
-    {
-        return "åÅ".Contains(character);
-    }
-
-    private static string NormalizeWord(string word)
-    {
-        return new string(word.Where(char.IsLetter).Select(char.ToLowerInvariant).ToArray());
     }
 }
