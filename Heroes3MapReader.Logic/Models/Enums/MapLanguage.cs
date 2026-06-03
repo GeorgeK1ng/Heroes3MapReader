@@ -10,5 +10,10 @@ public enum MapLanguage
     Russian,
     Chinese,
     Czech,
+    German,
+    French,
+    Ukrainian,
+    Hungarian,
+    Swedish,
     Other,
 }

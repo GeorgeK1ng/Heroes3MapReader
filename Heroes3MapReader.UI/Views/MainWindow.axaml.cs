@@ -1,5 +1,7 @@
+using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Heroes3MapReader.UI.ViewModels;
 
 namespace Heroes3MapReader.UI.Views;
 
@@ -14,6 +16,11 @@ public partial class MainWindow : Window
         {
             dataGrid.SelectionChanged += (s, e) =>
             {
+                if (DataContext is MainWindowViewModel viewModel)
+                {
+                    viewModel.SetSelectedMaps(dataGrid.SelectedItems.OfType<MapItemViewModel>());
+                }
+
                 if (dataGrid.SelectedItem != null)
                 {
                     dataGrid.ScrollIntoView(dataGrid.SelectedItem, null);

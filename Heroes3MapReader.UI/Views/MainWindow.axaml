@@ -240,10 +240,18 @@
                           ItemsSource="{Binding FilteredMaps}"
                           SelectedItem="{Binding SelectedMap}"
                           IsReadOnly="True"
+                          SelectionMode="Extended"
                           GridLinesVisibility="Horizontal"
                           AutoGenerateColumns="False"
                           CanUserReorderColumns="True"
                           CanUserResizeColumns="True">
+                    <DataGrid.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Export selected maps..."
+                                      Command="{Binding ExportSelectedMapsCommand}"
+                                      IsEnabled="{Binding CanExportSelectedMaps}"/>
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Map Name"
                                             Binding="{Binding Map.Name}"

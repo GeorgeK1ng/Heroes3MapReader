@@ -31,6 +31,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanLoadMaps))]
+    [NotifyPropertyChangedFor(nameof(CanExportSelectedMaps))]
+    [NotifyCanExecuteChangedFor(nameof(ExportSelectedMapsCommand))]
     private bool _isLoading;
 
     [ObservableProperty]
@@ -76,6 +78,11 @@ public partial class MainWindowViewModel : ViewModelBase
     private ObservableCollection<MapItemViewModel> _filteredMaps = [];
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanExportSelectedMaps))]
+    [NotifyCanExecuteChangedFor(nameof(ExportSelectedMapsCommand))]
+    private int _selectedMapCount;
+
+    [ObservableProperty]
     private string _searchText = string.Empty;
 
     public ObservableCollection<FactionFilterItemViewModel> FactionFilters { get; } = [];
@@ -83,6 +90,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public ObservableCollection<MapSizeFilterItemViewModel> MapSizeFilters { get; } = [];
 
     private readonly List<MapItemViewModel> _allMaps = [];
+    private readonly List<MapItemViewModel> _selectedMaps = [];
 
     private readonly IMapReaderFactory _mapReaderFactory;
     private readonly IStorageProvider _storageProvider;
@@ -169,6 +177,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public List<bool?> HasUndergroundOptions { get; } = [null, true, false];
 
     public bool CanLoadMaps => !string.IsNullOrWhiteSpace(DirectoryPath) && !IsLoading;
+    public bool CanExportSelectedMaps => SelectedMapCount > 0 && !IsLoading;
 
     partial void OnSelectedPlayerCountChanged(int? value)
     {
@@ -331,6 +340,7 @@ public partial class MainWindowViewModel : ViewModelBase
         IsLoading = true;
         StatusMessage = "Scanning for maps...";
         _allMaps.Clear();
+        SetSelectedMaps([]);
         FilteredMaps = [];
 
         try
@@ -562,6 +572,47 @@ public partial class MainWindowViewModel : ViewModelBase
         }, cancellationToken);
     }
 
+    public void SetSelectedMaps(IEnumerable<MapItemViewModel> selectedMaps)
+    {
+        _selectedMaps.Clear();
+        _selectedMaps.AddRange(selectedMaps);
+        SelectedMapCount = _selectedMaps.Count;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanExportSelectedMaps))]
+    private async Task ExportSelectedMaps()
+    {
+        List<MapItemViewModel> mapsToExport = _selectedMaps.ToList();
+        if (mapsToExport.Count == 0)
+        {
+            StatusMessage = "No maps selected for export.";
+            return;
+        }
+
+        var options = new FolderPickerOpenOptions
+        {
+            Title = "Select Export Directory",
+            AllowMultiple = false,
+        };
+
+        IReadOnlyList<IStorageFolder> results = await _storageProvider.OpenFolderPickerAsync(options);
+        if (results.Count == 0 || results[0].TryGetLocalPath() is not string exportRoot)
+        {
+            StatusMessage = "Export cancelled.";
+            return;
+        }
+
+        try
+        {
+            int exportedCount = await Task.Run(() => ExportMaps(mapsToExport, exportRoot));
+            StatusMessage = $"Exported {exportedCount} map{(exportedCount == 1 ? string.Empty : "s")}.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error exporting maps: {ex.Message}";
+        }
+    }
+
     [RelayCommand]
     private void ClearFilters()
     {
@@ -624,6 +675,77 @@ public partial class MainWindowViewModel : ViewModelBase
     private void UpdateSelectedSpellCount()
     {
         SelectedSpellCount = SpellFilters.Count(f => f.IsSelected);
+    }
+
+    private static int ExportMaps(IEnumerable<MapItemViewModel> mapsToExport, string exportRoot)
+    {
+        Directory.CreateDirectory(exportRoot);
+
+        var exportedCount = 0;
+        foreach (MapItemViewModel map in mapsToExport)
+        {
+            string languageDirectory = Path.Combine(exportRoot, GetLanguageFolderName(map.Map.DescriptionLanguage));
+            Directory.CreateDirectory(languageDirectory);
+
+            string extension = Path.GetExtension(map.FilePath);
+            string mapName = string.IsNullOrWhiteSpace(map.Map.Name)
+                ? Path.GetFileNameWithoutExtension(map.FilePath)
+                : map.Map.Name;
+            string fileName = $"[{GetMapFormatPrefix(map.Map.Format)}] - {SanitizeFileName(mapName)}{extension}";
+            string destinationPath = GetUniqueDestinationPath(languageDirectory, fileName);
+
+            File.Copy(map.FilePath, destinationPath);
+            exportedCount++;
+        }
+
+        return exportedCount;
+    }
+
+    private static string GetMapFormatPrefix(MapFormat format)
+    {
+        return format switch
+        {
+            MapFormat.RoE => "RoE",
+            MapFormat.AB => "AB",
+            MapFormat.SoD => "SoD",
+            MapFormat.WoG => "WoG",
+            MapFormat.HotA => "HotA",
+            _ => format.ToString(),
+        };
+    }
+
+    private static string GetLanguageFolderName(MapLanguage language)
+    {
+        return language.ToString();
+    }
+
+    private static string SanitizeFileName(string fileName)
+    {
+        char[] invalidChars = Path.GetInvalidFileNameChars();
+        string sanitized = new(fileName.Select(character => invalidChars.Contains(character) ? '_' : character).ToArray());
+        return string.IsNullOrWhiteSpace(sanitized) ? "Unknown map" : sanitized.Trim();
+    }
+
+    private static string GetUniqueDestinationPath(string directory, string fileName)
+    {
+        string destinationPath = Path.Combine(directory, fileName);
+        if (!File.Exists(destinationPath))
+        {
+            return destinationPath;
+        }
+
+        string baseName = Path.GetFileNameWithoutExtension(fileName);
+        string extension = Path.GetExtension(fileName);
+        var counter = 2;
+
+        do
+        {
+            destinationPath = Path.Combine(directory, $"{baseName} ({counter}){extension}");
+            counter++;
+        }
+        while (File.Exists(destinationPath));
+
+        return destinationPath;
     }
 
     private static string GetDuplicateKey(string? name, string? description)
