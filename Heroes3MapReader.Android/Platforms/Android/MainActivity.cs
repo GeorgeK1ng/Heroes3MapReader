@@ -59,7 +59,7 @@ public class MainActivity : AvaloniaMainActivity<App>
 
     private void LogStartupException(Exception exception)
     {
-        string logContents = $"{DateTimeOffset.UtcNow:O}{Environment.NewLine}{exception}";
+        string logContents = $"{DateTimeOffset.UtcNow:O}{System.Environment.NewLine}{exception}";
 
         try
         {
