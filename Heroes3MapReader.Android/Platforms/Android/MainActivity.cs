@@ -59,18 +59,33 @@ public class MainActivity : AvaloniaMainActivity<App>
 
     private void LogStartupException(Exception exception)
     {
+        string logContents = $"{DateTimeOffset.UtcNow:O}{Environment.NewLine}{exception}";
+
         try
         {
-            Log.Error(LogTag, exception.ToString());
+            Log.Error(LogTag, logContents);
+        }
+        catch
+        {
+            // Avoid throwing while handling an unhandled exception.
+        }
 
-            string? filesPath = FilesDir?.AbsolutePath;
-            if (string.IsNullOrWhiteSpace(filesPath))
-            {
-                return;
-            }
+        WriteStartupLog(FilesDir?.AbsolutePath, logContents);
+        WriteStartupLog(GetExternalFilesDir(null)?.AbsolutePath, logContents);
+    }
 
-            string logPath = Path.Combine(filesPath, StartupErrorFileName);
-            File.WriteAllText(logPath, exception.ToString());
+    private static void WriteStartupLog(string? directoryPath, string logContents)
+    {
+        if (string.IsNullOrWhiteSpace(directoryPath))
+        {
+            return;
+        }
+
+        try
+        {
+            Directory.CreateDirectory(directoryPath);
+            string logPath = Path.Combine(directoryPath, StartupErrorFileName);
+            File.WriteAllText(logPath, logContents);
         }
         catch
         {
