@@ -10,6 +10,8 @@
         <ApplicationVersion>7</ApplicationVersion>
         <ApplicationDisplayVersion>1.7.0</ApplicationDisplayVersion>
         <AndroidPackageFormat>apk</AndroidPackageFormat>
+        <AndroidLinkMode>None</AndroidLinkMode>
+        <AndroidLinkResources>false</AndroidLinkResources>
     </PropertyGroup>
 
     <ItemGroup>
