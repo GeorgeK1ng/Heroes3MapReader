@@ -2,9 +2,8 @@
 
     <PropertyGroup>
         <TargetFramework Condition="'$(MobileTargetFramework)' != ''">$(MobileTargetFramework)</TargetFramework>
-        <TargetFramework Condition="'$(MobileTargetFramework)' == '' And '$(DesktopTargetFramework)' != ''">$(DesktopTargetFramework)</TargetFramework>
-        <TargetFramework Condition="'$(MobileTargetFramework)' == '' And '$(DesktopTargetFramework)' == '' And '$(EnableAndroidTargeting)' == 'true'">net8.0-android34.0</TargetFramework>
-        <TargetFramework Condition="'$(MobileTargetFramework)' == '' And '$(DesktopTargetFramework)' == '' And '$(EnableAndroidTargeting)' != 'true'">net8.0</TargetFramework>
+        <TargetFramework Condition="'$(MobileTargetFramework)' == '' And '$(EnableAndroidTargeting)' == 'true'">net8.0-android34.0</TargetFramework>
+        <TargetFramework Condition="'$(MobileTargetFramework)' == '' And '$(EnableAndroidTargeting)' != 'true'">net8.0</TargetFramework>
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
@@ -14,7 +13,7 @@
     <ItemGroup>
         <PackageReference Include="NTextCat" Version="0.3.65" />
         <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
-        <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
+        <PackageReference Include="System.Text.Encoding.CodePages" Version="10.0.1" />
     </ItemGroup>
     <ItemGroup>
         <None Include="$(NuGetPackageRoot)ntextcat\0.3.65\content\LanguageModels\*.profile.xml"

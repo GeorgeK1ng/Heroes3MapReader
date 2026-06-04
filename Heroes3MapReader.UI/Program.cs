@@ -40,16 +40,6 @@ internal class Program
             .WithInterFont()
             .LogToTrace();
 
-#if NET6_0_WINDOWS
-        // Windows 7 machines frequently lack modern GPU/DirectX components used by the default backend.
-        // Force software rendering for the Windows 7-compatible build so startup does not fail silently
-        // before the first window is shown.
-        builder.With(new Win32PlatformOptions
-        {
-            RenderingMode = new[] { Win32RenderingMode.Software },
-        });
-#endif
-
 #if DEBUG
         builder.AfterSetup(_ =>
         {
