@@ -32,6 +32,10 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      - name: Download public language dictionaries
+        shell: bash
+        run: scripts/download-language-dictionaries.sh
+
       - name: Restore dependencies
         run: dotnet restore Heroes3MapReader.sln --disable-parallel
 
@@ -80,6 +84,10 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      - name: Download public language dictionaries
+        shell: bash
+        run: scripts/download-language-dictionaries.sh
+
       - name: Restore UI project
         run: dotnet restore Heroes3MapReader.UI/Heroes3MapReader.UI.csproj --runtime ${{ matrix.runtime }}
 
@@ -122,6 +130,10 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+
+      - name: Download public language dictionaries
+        shell: bash
+        run: scripts/download-language-dictionaries.sh
 
       - name: Restore UI project
         run: dotnet restore Heroes3MapReader.UI/Heroes3MapReader.UI.csproj --runtime ${{ matrix.runtime }}
@@ -193,6 +205,10 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      - name: Download public language dictionaries
+        shell: bash
+        run: scripts/download-language-dictionaries.sh
+
       - name: Install iOS workload
         run: dotnet workload install ios
 
@@ -246,6 +262,10 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+
+      - name: Download public language dictionaries
+        shell: bash
+        run: scripts/download-language-dictionaries.sh
 
       - name: Install Android workload
         run: dotnet workload install android

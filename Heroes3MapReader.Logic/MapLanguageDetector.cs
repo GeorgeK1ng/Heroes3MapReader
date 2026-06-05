@@ -13,41 +13,6 @@ public static class MapLanguageDetector
 {
     private const string UnknownLanguageCode = "und";
 
-    private static readonly IReadOnlyDictionary<string, DetectedLanguage> PublicDictionaryLanguages = new Dictionary<string, DetectedLanguage>(StringComparer.OrdinalIgnoreCase)
-    {
-        ["ces"] = new("ces", "Czech"),
-        ["cze"] = new("ces", "Czech"),
-        ["cs"] = new("ces", "Czech"),
-        ["cs_cz"] = new("ces", "Czech"),
-        ["eng"] = new("eng", "English"),
-        ["en"] = new("eng", "English"),
-        ["en_us"] = new("eng", "English"),
-        ["en_gb"] = new("eng", "English"),
-        ["pol"] = new("pol", "Polish"),
-        ["pl"] = new("pol", "Polish"),
-        ["pl_pl"] = new("pol", "Polish"),
-        ["deu"] = new("deu", "German"),
-        ["ger"] = new("deu", "German"),
-        ["de"] = new("deu", "German"),
-        ["de_de"] = new("deu", "German"),
-        ["fra"] = new("fra", "French"),
-        ["fre"] = new("fra", "French"),
-        ["fr"] = new("fra", "French"),
-        ["fr_fr"] = new("fra", "French"),
-        ["hun"] = new("hun", "Hungarian"),
-        ["hu"] = new("hun", "Hungarian"),
-        ["hu_hu"] = new("hun", "Hungarian"),
-        ["swe"] = new("swe", "Swedish"),
-        ["sv"] = new("swe", "Swedish"),
-        ["sv_se"] = new("swe", "Swedish"),
-        ["spa"] = new("spa", "Spanish"),
-        ["es"] = new("spa", "Spanish"),
-        ["es_es"] = new("spa", "Spanish"),
-        ["ita"] = new("ita", "Italian"),
-        ["it"] = new("ita", "Italian"),
-        ["it_it"] = new("ita", "Italian"),
-    };
-
     private static readonly Lazy<RankedLanguageIdentifier?> LanguageIdentifier = new(LoadLanguageIdentifier);
     private static readonly Lazy<IReadOnlyDictionary<DetectedLanguage, HashSet<string>>> PublicWordDictionaries = new(LoadPublicWordDictionaries);
 
@@ -63,10 +28,13 @@ public static class MapLanguageDetector
             return DetectedLanguage.Unknown;
         }
 
-        DetectedLanguage? languageSpecificCharacterFallback = DetectByLanguageSpecificCharacters(description);
-        if (languageSpecificCharacterFallback != null)
+        if (!HasCjkText(description) && !HasCyrillicText(description))
         {
-            return languageSpecificCharacterFallback;
+            DetectedLanguage? dictionaryLanguage = DetectByPublicDictionary(description);
+            if (dictionaryLanguage != null)
+            {
+                return dictionaryLanguage;
+            }
         }
 
         RankedLanguageIdentifier? identifier = LanguageIdentifier.Value;
@@ -197,29 +165,6 @@ public static class MapLanguageDetector
         return DetectedLanguage.Unknown;
     }
 
-    private static DetectedLanguage? DetectByLanguageSpecificCharacters(string description)
-    {
-        Dictionary<DetectedLanguage, int> scores = new()
-        {
-            [new DetectedLanguage("ces", "Czech")] = CountAny(description, "čďěňřšťůžČĎĚŇŘŠŤŮŽ"),
-            [new DetectedLanguage("pol", "Polish")] = CountAny(description, "ąćęłńśźżĄĆĘŁŃŚŹŻ"),
-            [new DetectedLanguage("hun", "Hungarian")] = CountAny(description, "őűŐŰ"),
-            [new DetectedLanguage("deu", "German")] = CountAny(description, "ßẞ"),
-            [new DetectedLanguage("swe", "Swedish")] = CountAny(description, "åÅ"),
-            [new DetectedLanguage("fra", "French")] = CountAny(description, "æçœÆÇŒ"),
-            [new DetectedLanguage("spa", "Spanish")] = CountAny(description, "ñÑ¿¡"),
-        };
-
-        KeyValuePair<DetectedLanguage, int> bestScore = scores.MaxBy(pair => pair.Value);
-        int secondBestScore = scores
-            .Where(pair => pair.Key != bestScore.Key)
-            .Max(pair => pair.Value);
-
-        return bestScore.Value >= 1 && bestScore.Value >= secondBestScore + 1
-            ? bestScore.Key
-            : null;
-    }
-
     private static DetectedLanguage? DetectByPublicDictionary(string description)
     {
         IReadOnlyDictionary<DetectedLanguage, HashSet<string>> dictionaries = PublicWordDictionaries.Value;
@@ -254,14 +199,33 @@ public static class MapLanguageDetector
             : null;
     }
 
+    private static DetectedLanguage? DetectLanguageFromDictionaryFileName(string dictionaryPath)
+    {
+        string fileName = Path.GetFileNameWithoutExtension(dictionaryPath);
+        string normalizedCultureName = fileName
+            .Replace('_', '-')
+            .Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)[0];
+
+        try
+        {
+            CultureInfo culture = CultureInfo.GetCultureInfo(normalizedCultureName);
+            string languageCode = NormalizeLanguageCode(culture.ThreeLetterISOLanguageName);
+            return new DetectedLanguage(languageCode, GetLanguageName(languageCode));
+        }
+        catch (CultureNotFoundException)
+        {
+            return null;
+        }
+    }
+
     private static IReadOnlyDictionary<DetectedLanguage, HashSet<string>> LoadPublicWordDictionaries()
     {
         Dictionary<DetectedLanguage, HashSet<string>> dictionaries = new();
 
         foreach (string dictionaryPath in GetPublicDictionaryPaths())
         {
-            string dictionaryKey = NormalizeDictionaryKey(Path.GetFileNameWithoutExtension(dictionaryPath));
-            if (!PublicDictionaryLanguages.TryGetValue(dictionaryKey, out DetectedLanguage? language))
+            DetectedLanguage? language = DetectLanguageFromDictionaryFileName(dictionaryPath);
+            if (language == null)
             {
                 continue;
             }
@@ -301,11 +265,6 @@ public static class MapLanguageDetector
             {
                 yield return dictionaryPath;
             }
-
-            foreach (string dictionaryPath in Directory.EnumerateFiles(dictionariesDirectory, "*.txt"))
-            {
-                yield return dictionaryPath;
-            }
         }
     }
 
@@ -335,19 +294,6 @@ public static class MapLanguageDetector
         }
 
         return words;
-    }
-
-    private static string NormalizeDictionaryKey(string dictionaryKey)
-    {
-        return dictionaryKey
-            .Trim()
-            .Replace('-', '_')
-            .ToLowerInvariant();
-    }
-
-    private static int CountAny(string text, string characters)
-    {
-        return text.Count(characters.Contains);
     }
 
     private static string NormalizeLanguageCode(string? languageCode)

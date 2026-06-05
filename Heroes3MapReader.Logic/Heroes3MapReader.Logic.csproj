@@ -24,10 +24,14 @@
     </ItemGroup>
 
     <ItemGroup>
-        <None Include="LanguageDictionaries\**\*.*"
+        <None Include="LanguageDictionaries\*.dic"
               CopyToOutputDirectory="PreserveNewest"
               CopyToPublishDirectory="PreserveNewest"
               Condition="Exists('LanguageDictionaries')" />
+        <None Include="LanguageDictionaries\SOURCES.md"
+              CopyToOutputDirectory="PreserveNewest"
+              CopyToPublishDirectory="PreserveNewest"
+              Condition="Exists('LanguageDictionaries\SOURCES.md')" />
     </ItemGroup>
 
 </Project>

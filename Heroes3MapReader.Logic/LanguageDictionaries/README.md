@@ -1,17 +1,9 @@
 # Public language dictionaries
 
-Place public Hunspell/OpenOffice/LibreOffice-style `.dic` dictionaries or plain one-word-per-line `.txt` word lists in this directory to improve Latin-script language fallback detection.
+This directory is intentionally kept without generated dictionary data in git. Release builds download real public Hunspell dictionaries from the LibreOffice dictionaries repository by running:
 
-Supported file names are based on ISO language codes, for example:
+```bash
+scripts/download-language-dictionaries.sh
+```
 
-- `cs_CZ.dic`, `cs.dic`, `ces.dic`, or `cze.dic` for Czech
-- `en_US.dic`, `en_GB.dic`, `en.dic`, or `eng.dic` for English
-- `pl_PL.dic`, `pl.dic`, or `pol.dic` for Polish
-- `de_DE.dic`, `de.dic`, `deu.dic`, or `ger.dic` for German
-- `fr_FR.dic`, `fr.dic`, `fra.dic`, or `fre.dic` for French
-- `hu_HU.dic`, `hu.dic`, or `hun.dic` for Hungarian
-- `sv_SE.dic`, `sv.dic`, or `swe.dic` for Swedish
-- `es_ES.dic`, `es.dic`, or `spa.dic` for Spanish
-- `it_IT.dic`, `it.dic`, or `ita.dic` for Italian
-
-The application does not maintain a custom in-repository word list. NTextCat remains the primary detector, and these public dictionaries are used only as a fallback when they are present in the published output.
+The downloaded `.dic` files are used as the Latin-script language fallback. NTextCat remains available as the statistical detector, but the application no longer maintains a custom in-repository word list.
