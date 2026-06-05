@@ -23,4 +23,11 @@
               Condition="Exists('$(NuGetPackageRoot)ntextcat\0.3.65\content\LanguageModels')" />
     </ItemGroup>
 
+    <ItemGroup>
+        <None Include="LanguageDictionaries\**\*.*"
+              CopyToOutputDirectory="PreserveNewest"
+              CopyToPublishDirectory="PreserveNewest"
+              Condition="Exists('LanguageDictionaries')" />
+    </ItemGroup>
+
 </Project>

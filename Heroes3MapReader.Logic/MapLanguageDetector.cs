@@ -7,39 +7,49 @@ using NTextCat;
 namespace Heroes3MapReader.Logic;
 
 /// <summary>
-/// Detects the most likely language of map descriptions using NTextCat language models.
+/// Detects the most likely language of map descriptions using NTextCat models and optional public dictionary fallbacks.
 /// </summary>
 public static class MapLanguageDetector
 {
     private const string UnknownLanguageCode = "und";
 
-    private static readonly Dictionary<string, DetectedLanguage> LatinFallbackLanguages = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly IReadOnlyDictionary<string, DetectedLanguage> PublicDictionaryLanguages = new Dictionary<string, DetectedLanguage>(StringComparer.OrdinalIgnoreCase)
     {
-        ["czech"] = new("ces", "Czech"),
-        ["english"] = new("eng", "English"),
-        ["polish"] = new("pol", "Polish"),
-        ["german"] = new("deu", "German"),
-        ["french"] = new("fra", "French"),
-        ["hungarian"] = new("hun", "Hungarian"),
-        ["swedish"] = new("swe", "Swedish"),
-        ["spanish"] = new("spa", "Spanish"),
-        ["italian"] = new("ita", "Italian"),
-    };
-
-    private static readonly Dictionary<string, HashSet<string>> LatinFallbackWords = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["czech"] = new(StringComparer.OrdinalIgnoreCase) { "aztekove", "byt", "byl", "byla", "cesky", "cesta", "den", "dva", "hrad", "jejich", "jsou", "kral", "mapa", "mayove", "mesto", "musis", "narody", "neprateli", "nezavislosti", "nyni", "ohrozovani", "pekelniky", "poraz", "pro", "proti", "silami", "starymi", "tvuj", "ukol", "vybojujte", "zamek", "zeme" },
-        ["english"] = new(StringComparer.OrdinalIgnoreCase) { "after", "against", "all", "and", "army", "battle", "castle", "defeat", "enemy", "find", "for", "hero", "king", "map", "must", "the", "this", "town", "war", "with", "you", "your" },
-        ["polish"] = new(StringComparer.OrdinalIgnoreCase) { "armia", "bitwa", "bohater", "dla", "dwa", "jest", "kraina", "krol", "krolestwo", "mapa", "miasto", "musisz", "nie", "pokonaj", "polski", "przeciw", "skarbu", "twoj", "twoja", "wojna", "zamek", "ziemia", "znajdz" },
-        ["german"] = new(StringComparer.OrdinalIgnoreCase) { "alle", "auf", "burg", "dein", "der", "die", "ein", "feind", "finde", "gegen", "held", "karte", "koenig", "konig", "land", "mit", "musst", "stadt", "und" },
-        ["french"] = new(StringComparer.OrdinalIgnoreCase) { "avec", "carte", "chateau", "contre", "dans", "des", "doit", "ennemi", "est", "etre", "francais", "heros", "les", "pour", "que", "quete", "roi", "royaume", "sur", "terre", "trouver", "une", "vous", "votre" },
-        ["hungarian"] = new(StringComparer.OrdinalIgnoreCase) { "arany", "az", "csak", "ellenseg", "ellen", "es", "feladat", "fold", "hos", "kell", "keresd", "kiraly", "kincs", "magyar", "meg", "terkep", "var", "varos", "vagy" },
-        ["swedish"] = new(StringComparer.OrdinalIgnoreCase) { "alla", "borg", "den", "det", "din", "du", "efter", "fiende", "hitta", "hjalte", "karta", "kung", "land", "maste", "med", "mot", "och", "skatt", "stad" },
-        ["spanish"] = new(StringComparer.OrdinalIgnoreCase) { "castillo", "contra", "debes", "derrota", "el", "enemigo", "encontrar", "guerra", "heroe", "mapa", "para", "reino", "tesoro", "tierra", "tu" },
-        ["italian"] = new(StringComparer.OrdinalIgnoreCase) { "castello", "contro", "devi", "eroe", "guerra", "il", "mappa", "nemico", "per", "regno", "terra", "tesoro", "trova", "tuo" },
+        ["ces"] = new("ces", "Czech"),
+        ["cze"] = new("ces", "Czech"),
+        ["cs"] = new("ces", "Czech"),
+        ["cs_cz"] = new("ces", "Czech"),
+        ["eng"] = new("eng", "English"),
+        ["en"] = new("eng", "English"),
+        ["en_us"] = new("eng", "English"),
+        ["en_gb"] = new("eng", "English"),
+        ["pol"] = new("pol", "Polish"),
+        ["pl"] = new("pol", "Polish"),
+        ["pl_pl"] = new("pol", "Polish"),
+        ["deu"] = new("deu", "German"),
+        ["ger"] = new("deu", "German"),
+        ["de"] = new("deu", "German"),
+        ["de_de"] = new("deu", "German"),
+        ["fra"] = new("fra", "French"),
+        ["fre"] = new("fra", "French"),
+        ["fr"] = new("fra", "French"),
+        ["fr_fr"] = new("fra", "French"),
+        ["hun"] = new("hun", "Hungarian"),
+        ["hu"] = new("hun", "Hungarian"),
+        ["hu_hu"] = new("hun", "Hungarian"),
+        ["swe"] = new("swe", "Swedish"),
+        ["sv"] = new("swe", "Swedish"),
+        ["sv_se"] = new("swe", "Swedish"),
+        ["spa"] = new("spa", "Spanish"),
+        ["es"] = new("spa", "Spanish"),
+        ["es_es"] = new("spa", "Spanish"),
+        ["ita"] = new("ita", "Italian"),
+        ["it"] = new("ita", "Italian"),
+        ["it_it"] = new("ita", "Italian"),
     };
 
     private static readonly Lazy<RankedLanguageIdentifier?> LanguageIdentifier = new(LoadLanguageIdentifier);
+    private static readonly Lazy<IReadOnlyDictionary<DetectedLanguage, HashSet<string>>> PublicWordDictionaries = new(LoadPublicWordDictionaries);
 
     /// <summary>
     /// Detects the most likely language from a map description.
@@ -53,10 +63,10 @@ public static class MapLanguageDetector
             return DetectedLanguage.Unknown;
         }
 
-        DetectedLanguage? strongLatinFallback = DetectLatinFallback(description, requireStrongEvidence: true);
-        if (strongLatinFallback != null)
+        DetectedLanguage? languageSpecificCharacterFallback = DetectByLanguageSpecificCharacters(description);
+        if (languageSpecificCharacterFallback != null)
         {
-            return strongLatinFallback;
+            return languageSpecificCharacterFallback;
         }
 
         RankedLanguageIdentifier? identifier = LanguageIdentifier.Value;
@@ -177,7 +187,7 @@ public static class MapLanguageDetector
 
         if (latinCount >= letterCount * 0.6)
         {
-            DetectedLanguage? latinLanguage = DetectLatinFallback(description);
+            DetectedLanguage? latinLanguage = DetectByPublicDictionary(description);
             if (latinLanguage != null)
             {
                 return latinLanguage;
@@ -187,78 +197,157 @@ public static class MapLanguageDetector
         return DetectedLanguage.Unknown;
     }
 
-    private static DetectedLanguage? DetectLatinFallback(string description, bool requireStrongEvidence = false)
+    private static DetectedLanguage? DetectByLanguageSpecificCharacters(string description)
     {
+        Dictionary<DetectedLanguage, int> scores = new()
+        {
+            [new DetectedLanguage("ces", "Czech")] = CountAny(description, "čďěňřšťůžČĎĚŇŘŠŤŮŽ"),
+            [new DetectedLanguage("pol", "Polish")] = CountAny(description, "ąćęłńśźżĄĆĘŁŃŚŹŻ"),
+            [new DetectedLanguage("hun", "Hungarian")] = CountAny(description, "őűŐŰ"),
+            [new DetectedLanguage("deu", "German")] = CountAny(description, "ßẞ"),
+            [new DetectedLanguage("swe", "Swedish")] = CountAny(description, "åÅ"),
+            [new DetectedLanguage("fra", "French")] = CountAny(description, "æçœÆÇŒ"),
+            [new DetectedLanguage("spa", "Spanish")] = CountAny(description, "ñÑ¿¡"),
+        };
+
+        KeyValuePair<DetectedLanguage, int> bestScore = scores.MaxBy(pair => pair.Value);
+        int secondBestScore = scores
+            .Where(pair => pair.Key != bestScore.Key)
+            .Max(pair => pair.Value);
+
+        return bestScore.Value >= 1 && bestScore.Value >= secondBestScore + 1
+            ? bestScore.Key
+            : null;
+    }
+
+    private static DetectedLanguage? DetectByPublicDictionary(string description)
+    {
+        IReadOnlyDictionary<DetectedLanguage, HashSet<string>> dictionaries = PublicWordDictionaries.Value;
+        if (dictionaries.Count == 0)
+        {
+            return null;
+        }
+
         string[] words = description
             .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(NormalizeWord)
             .Where(word => word.Length > 1)
             .ToArray();
 
-        Dictionary<string, int> scores = LatinFallbackWords.ToDictionary(
-            pair => pair.Key,
-            pair => words.Count(pair.Value.Contains),
-            StringComparer.OrdinalIgnoreCase);
-
-        foreach (char character in description)
-        {
-            if ("čďěňřšťůžČĎĚŇŘŠŤŮŽ".Contains(character))
-            {
-                scores["czech"] += 3;
-            }
-            else if ("ąćęłńśźżĄĆĘŁŃŚŹŻ".Contains(character))
-            {
-                scores["polish"] += 4;
-            }
-            else if ("őűŐŰ".Contains(character))
-            {
-                scores["hungarian"] += 4;
-            }
-            else if ("åÅ".Contains(character))
-            {
-                scores["swedish"] += 3;
-            }
-            else if ("ßẞäöüÄÖÜ".Contains(character))
-            {
-                scores["german"] += 2;
-                scores["swedish"] += 1;
-            }
-            else if ("àâæçèéêëîïôœùûüÿÀÂÆÇÈÉÊËÎÏÔŒÙÛÜŸ".Contains(character))
-            {
-                scores["french"] += 2;
-            }
-        }
-
-        KeyValuePair<string, int> bestScore = scores.MaxBy(pair => pair.Value);
-        if (bestScore.Value < 2)
+        if (words.Length == 0)
         {
             return null;
         }
 
-        if (requireStrongEvidence)
+        KeyValuePair<DetectedLanguage, int>[] scores = dictionaries
+            .Select(dictionary => new KeyValuePair<DetectedLanguage, int>(
+                dictionary.Key,
+                words.Count(dictionary.Value.Contains)))
+            .OrderByDescending(pair => pair.Value)
+            .ToArray();
+
+        KeyValuePair<DetectedLanguage, int> bestScore = scores[0];
+        int secondBestScore = scores.Length > 1 ? scores[1].Value : 0;
+
+        return bestScore.Value >= 2 && bestScore.Value >= secondBestScore + 2
+            ? bestScore.Key
+            : null;
+    }
+
+    private static IReadOnlyDictionary<DetectedLanguage, HashSet<string>> LoadPublicWordDictionaries()
+    {
+        Dictionary<DetectedLanguage, HashSet<string>> dictionaries = new();
+
+        foreach (string dictionaryPath in GetPublicDictionaryPaths())
         {
-            int secondBestScore = scores
-                .Where(pair => !string.Equals(pair.Key, bestScore.Key, StringComparison.OrdinalIgnoreCase))
-                .Max(pair => pair.Value);
-
-            bool hasLanguageSpecificCharacters = bestScore.Key switch
+            string dictionaryKey = NormalizeDictionaryKey(Path.GetFileNameWithoutExtension(dictionaryPath));
+            if (!PublicDictionaryLanguages.TryGetValue(dictionaryKey, out DetectedLanguage? language))
             {
-                "czech" => description.Any(character => "čďěňřšťůžČĎĚŇŘŠŤŮŽ".Contains(character)),
-                "polish" => description.Any(character => "ąćęłńśźżĄĆĘŁŃŚŹŻ".Contains(character)),
-                "hungarian" => description.Any(character => "őűŐŰ".Contains(character)),
-                "french" => description.Any(character => "àâæçèêëîïôœùûüÿÀÂÆÇÈÊËÎÏÔŒÙÛÜŸ".Contains(character)),
-                "german" => description.Any(character => "ßẞ".Contains(character)),
-                "swedish" => description.Any(character => "åÅ".Contains(character)),
-                _ => false,
-            };
+                continue;
+            }
 
-            if (!hasLanguageSpecificCharacters && bestScore.Value < secondBestScore + 2)
+            HashSet<string> words = LoadDictionaryWords(dictionaryPath);
+            if (words.Count > 0)
             {
-                return null;
+                dictionaries[language] = words;
             }
         }
 
-        return LatinFallbackLanguages[bestScore.Key];
+        return dictionaries;
+    }
+
+    private static IEnumerable<string> GetPublicDictionaryPaths()
+    {
+        string? assemblyDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+        string[] baseDirectories = new[]
+            {
+                AppContext.BaseDirectory,
+                assemblyDirectory,
+            }
+            .Where(directory => !string.IsNullOrWhiteSpace(directory))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Cast<string>()
+            .ToArray();
+
+        foreach (string baseDirectory in baseDirectories)
+        {
+            string dictionariesDirectory = Path.Combine(baseDirectory, "LanguageDictionaries");
+            if (!Directory.Exists(dictionariesDirectory))
+            {
+                continue;
+            }
+
+            foreach (string dictionaryPath in Directory.EnumerateFiles(dictionariesDirectory, "*.dic"))
+            {
+                yield return dictionaryPath;
+            }
+
+            foreach (string dictionaryPath in Directory.EnumerateFiles(dictionariesDirectory, "*.txt"))
+            {
+                yield return dictionaryPath;
+            }
+        }
+    }
+
+    private static HashSet<string> LoadDictionaryWords(string dictionaryPath)
+    {
+        HashSet<string> words = new(StringComparer.OrdinalIgnoreCase);
+
+        foreach (string rawLine in File.ReadLines(dictionaryPath))
+        {
+            string line = rawLine.Trim();
+            if (line.Length == 0 || line.StartsWith('#') || line.StartsWith('/'))
+            {
+                continue;
+            }
+
+            if (words.Count == 0 && line.All(char.IsDigit))
+            {
+                continue;
+            }
+
+            string dictionaryWord = line.Split('/', 2, StringSplitOptions.TrimEntries)[0];
+            string normalizedWord = NormalizeWord(dictionaryWord);
+            if (normalizedWord.Length > 1)
+            {
+                words.Add(normalizedWord);
+            }
+        }
+
+        return words;
+    }
+
+    private static string NormalizeDictionaryKey(string dictionaryKey)
+    {
+        return dictionaryKey
+            .Trim()
+            .Replace('-', '_')
+            .ToLowerInvariant();
+    }
+
+    private static int CountAny(string text, string characters)
+    {
+        return text.Count(characters.Contains);
     }
 
     private static string NormalizeLanguageCode(string? languageCode)
@@ -294,6 +383,8 @@ public static class MapLanguageDetector
             "pol" => "Polish",
             "rus" => "Russian",
             "swe" => "Swedish",
+            "spa" => "Spanish",
+            "ita" => "Italian",
             "ukr" => "Ukrainian",
             "zho" => "Chinese",
             UnknownLanguageCode => "Unknown",
