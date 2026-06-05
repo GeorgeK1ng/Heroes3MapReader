@@ -253,7 +253,7 @@
                                             Binding="{Binding Map.Name}"
                                             Width="*"
                                             MinWidth="200"/>
-                        <DataGridTextColumn Header="Format"
+                        <DataGridTextColumn Header="Form"
                                             Binding="{Binding Map.Format, Converter={StaticResource MapFormatConverter}, Mode=OneWay}"
                                             Width="80"/>
                         <DataGridTextColumn Header="Size"
