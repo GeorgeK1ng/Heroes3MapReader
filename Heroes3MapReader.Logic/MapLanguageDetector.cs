@@ -202,19 +202,34 @@ public static class MapLanguageDetector
     private static DetectedLanguage? DetectLanguageFromDictionaryFileName(string dictionaryPath)
     {
         string fileName = Path.GetFileNameWithoutExtension(dictionaryPath);
-        string normalizedCultureName = fileName
-            .Replace('_', '-')
-            .Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)[0];
+        string normalizedCultureName = fileName.Replace('_', '-');
 
-        try
+        foreach (string cultureNameCandidate in GetCultureNameCandidates(normalizedCultureName))
         {
-            CultureInfo culture = CultureInfo.GetCultureInfo(normalizedCultureName);
-            string languageCode = NormalizeLanguageCode(culture.ThreeLetterISOLanguageName);
-            return new DetectedLanguage(languageCode, GetLanguageName(languageCode));
+            try
+            {
+                CultureInfo culture = CultureInfo.GetCultureInfo(cultureNameCandidate);
+                string languageCode = NormalizeLanguageCode(culture.ThreeLetterISOLanguageName);
+                return new DetectedLanguage(languageCode, GetLanguageName(languageCode));
+            }
+            catch (CultureNotFoundException)
+            {
+                // Keep trying less-specific names because LibreOffice files can include suffixes
+                // such as de_DE_frami.dic or sr_Latn_RS.dic.
+            }
         }
-        catch (CultureNotFoundException)
+
+        return null;
+    }
+
+    private static IEnumerable<string> GetCultureNameCandidates(string normalizedCultureName)
+    {
+        string[] cultureNameParts = normalizedCultureName
+            .Split('-', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        for (int takeCount = cultureNameParts.Length; takeCount > 0; takeCount--)
         {
-            return null;
+            yield return string.Join('-', cultureNameParts.Take(takeCount));
         }
     }
 
