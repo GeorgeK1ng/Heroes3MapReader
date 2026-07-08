@@ -110,7 +110,7 @@ jobs:
           if-no-files-found: error
 
   # .NET 8 does not provide a linux-x86 desktop runtime identifier, so the AppImage job
-  # intentionally builds the supported Intel/AMD Linux desktop target: linux-x64.
+  # builds supported Linux desktop targets: linux-x64 and linux-arm64.
   publish-linux-appimage:
     name: Publish ${{ matrix.artifact_name }}
     runs-on: ubuntu-latest
@@ -120,7 +120,12 @@ jobs:
         include:
           - runtime: linux-x64
             appimage_arch: x86_64
+            appimagetool_arch: x86_64
             artifact_name: Heroes3MapReader-linux-x64-AppImage
+          - runtime: linux-arm64
+            appimage_arch: aarch64
+            appimagetool_arch: x86_64
+            artifact_name: Heroes3MapReader-linux-arm64-AppImage
 
     steps:
       - name: Checkout repository
@@ -174,7 +179,7 @@ jobs:
           PY
           cp AppDir/usr/share/applications/heroes3mapreader.desktop AppDir/heroes3mapreader.desktop
           cp AppDir/usr/share/icons/hicolor/256x256/apps/heroes3mapreader.png AppDir/heroes3mapreader.png
-          wget -q -O appimagetool https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-${{ matrix.appimage_arch }}.AppImage
+          wget -q -O appimagetool https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-${{ matrix.appimagetool_arch }}.AppImage
           chmod +x appimagetool
           ARCH=${{ matrix.appimage_arch }} APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool AppDir artifacts/Heroes3MapReader-${{ matrix.appimage_arch }}.AppImage
 
@@ -185,119 +190,3 @@ jobs:
           path: artifacts/*.AppImage
           if-no-files-found: error
 
-
-  # Unsigned iOS device IPA files cannot be produced without Apple signing assets.
-  # Simulator apps also cannot be published by `dotnet publish`, so CI performs one
-  # simulator build to verify the iOS head compiles and uploads that build output.
-  build-ios-simulator:
-    name: Build Heroes3MapReader-ios-simulator-x64
-    runs-on: macos-latest
-    env:
-      IOS_RUNTIME: iossimulator-x64
-      IOS_ARTIFACT_NAME: Heroes3MapReader-ios-simulator-x64
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 8.0.x
-
-      - name: Download public language dictionaries
-        shell: bash
-        run: scripts/download-language-dictionaries.sh
-
-      - name: Install iOS workload
-        run: dotnet workload install ios
-
-      - name: Restore iOS simulator project
-        run: >-
-          dotnet restore Heroes3MapReader.iOS/Heroes3MapReader.iOS.csproj
-          --runtime ${{ env.IOS_RUNTIME }}
-          --disable-parallel
-          /p:MobileTargetFramework=net8.0-ios
-
-      - name: Build iOS simulator app
-        run: >-
-          dotnet build Heroes3MapReader.iOS/Heroes3MapReader.iOS.csproj
-          --configuration Release
-          --framework net8.0-ios
-          --runtime ${{ env.IOS_RUNTIME }}
-          --no-restore
-          --disable-build-servers
-          -m:1
-          /p:BuildInParallel=false
-          /p:MobileTargetFramework=net8.0-ios
-          /p:DebugType=None
-          /p:DebugSymbols=false
-
-      - name: Upload iOS simulator artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.IOS_ARTIFACT_NAME }}
-          path: Heroes3MapReader.iOS/bin/Release/net8.0-ios/${{ env.IOS_RUNTIME }}
-          if-no-files-found: error
-
-  publish-android:
-    name: Publish ${{ matrix.artifact_name }}
-    runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runtime: android-arm
-            artifact_name: Heroes3MapReader-android-arm32
-          - runtime: android-arm64
-            artifact_name: Heroes3MapReader-android-arm64
-          - runtime: android-x64
-            artifact_name: Heroes3MapReader-android-x86_64
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 8.0.x
-
-      - name: Download public language dictionaries
-        shell: bash
-        run: scripts/download-language-dictionaries.sh
-
-      - name: Install Android workload
-        run: dotnet workload install android
-
-      - name: Restore Android project
-        run: >-
-          dotnet restore Heroes3MapReader.Android/Heroes3MapReader.Android.csproj
-          --runtime ${{ matrix.runtime }}
-          --disable-parallel
-          /p:EnableAndroidTargeting=true
-
-      - name: Publish Android APK
-        run: >-
-          dotnet publish Heroes3MapReader.Android/Heroes3MapReader.Android.csproj
-          --configuration Release
-          --framework net8.0-android34.0
-          --runtime ${{ matrix.runtime }}
-          --no-restore
-          --disable-build-servers
-          -m:1
-          --output artifacts/${{ matrix.artifact_name }}
-          /p:BuildInParallel=false
-          /p:UseSharedCompilation=false
-          /p:EnableAndroidTargeting=true
-          /p:AndroidPackageFormat=apk
-          /p:AndroidKeyStore=false
-          /p:DebugType=None
-          /p:DebugSymbols=false
-
-      - name: Upload Android APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact_name }}
-          path: artifacts/${{ matrix.artifact_name }}/**/*.apk
-          if-no-files-found: error

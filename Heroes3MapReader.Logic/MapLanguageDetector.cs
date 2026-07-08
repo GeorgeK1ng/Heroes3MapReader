@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Reflection;
 using System.Text;
 using Heroes3MapReader.Logic.Models;
 using NTextCat;
@@ -80,15 +79,9 @@ public static class MapLanguageDetector
 
     private static IEnumerable<string> GetLanguageModelPaths()
     {
-        string? assemblyDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-        string[] baseDirectories = new[]
-            {
-                AppContext.BaseDirectory,
-                assemblyDirectory,
-            }
+        string[] baseDirectories = new[] { AppContext.BaseDirectory }
             .Where(directory => !string.IsNullOrWhiteSpace(directory))
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Cast<string>()
             .ToArray();
 
         string[] modelFileNames =
@@ -257,15 +250,9 @@ public static class MapLanguageDetector
 
     private static IEnumerable<string> GetPublicDictionaryPaths()
     {
-        string? assemblyDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-        string[] baseDirectories = new[]
-            {
-                AppContext.BaseDirectory,
-                assemblyDirectory,
-            }
+        string[] baseDirectories = new[] { AppContext.BaseDirectory }
             .Where(directory => !string.IsNullOrWhiteSpace(directory))
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Cast<string>()
             .ToArray();
 
         foreach (string baseDirectory in baseDirectories)
