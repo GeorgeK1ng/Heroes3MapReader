@@ -31,6 +31,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanLoadMaps))]
+    [NotifyPropertyChangedFor(nameof(CanExportSelectedMaps))]
+    [NotifyCanExecuteChangedFor(nameof(ExportSelectedMapsCommand))]
     private bool _isLoading;
 
     [ObservableProperty]
@@ -52,6 +54,12 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool? _selectedHasUnderground;
 
     [ObservableProperty]
+    private string? _selectedDescriptionLanguage;
+
+    [ObservableProperty]
+    private bool _hideDuplicates;
+
+    [ObservableProperty]
     private MapItemViewModel? _selectedMap;
 
     [ObservableProperty]
@@ -70,13 +78,20 @@ public partial class MainWindowViewModel : ViewModelBase
     private ObservableCollection<MapItemViewModel> _filteredMaps = [];
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanExportSelectedMaps))]
+    [NotifyCanExecuteChangedFor(nameof(ExportSelectedMapsCommand))]
+    private int _selectedMapCount;
+
+    [ObservableProperty]
     private string _searchText = string.Empty;
 
     public ObservableCollection<FactionFilterItemViewModel> FactionFilters { get; } = [];
     public ObservableCollection<SpellFilterItemViewModel> SpellFilters { get; } = [];
     public ObservableCollection<MapSizeFilterItemViewModel> MapSizeFilters { get; } = [];
+    public ObservableCollection<string?> MapLanguages { get; } = [null];
 
     private readonly List<MapItemViewModel> _allMaps = [];
+    private readonly List<MapItemViewModel> _selectedMaps = [];
 
     private readonly IMapReaderFactory _mapReaderFactory;
     private readonly IStorageProvider _storageProvider;
@@ -161,6 +176,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public List<bool?> HasUndergroundOptions { get; } = [null, true, false];
 
     public bool CanLoadMaps => !string.IsNullOrWhiteSpace(DirectoryPath) && !IsLoading;
+    public bool CanExportSelectedMaps => SelectedMapCount > 0 && !IsLoading;
 
     partial void OnSelectedPlayerCountChanged(int? value)
     {
@@ -188,6 +204,16 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     partial void OnSelectedHasUndergroundChanged(bool? value)
+    {
+        ApplyFiltersAndSort();
+    }
+
+    partial void OnSelectedDescriptionLanguageChanged(string? value)
+    {
+        ApplyFiltersAndSort();
+    }
+
+    partial void OnHideDuplicatesChanged(bool value)
     {
         ApplyFiltersAndSort();
     }
@@ -313,6 +339,8 @@ public partial class MainWindowViewModel : ViewModelBase
         IsLoading = true;
         StatusMessage = "Scanning for maps...";
         _allMaps.Clear();
+        SetSelectedMaps([]);
+        ResetMapLanguageOptions();
         FilteredMaps = [];
 
         try
@@ -344,6 +372,7 @@ public partial class MainWindowViewModel : ViewModelBase
                         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                         {
                             _allMaps.Add(mapViewModel);
+                            AddMapLanguageOption(mapInfo.DescriptionLanguageName);
                             loadedCount++;
                             StatusMessage = $"Loading maps... {loadedCount + failedCount}/{totalFiles}";
                         });
@@ -432,6 +461,8 @@ public partial class MainWindowViewModel : ViewModelBase
         VictoryConditionType? selectedVictoryCondition = SelectedVictoryCondition;
         MapFormat? selectedFormat = SelectedFormat;
         bool? selectedHasUnderground = SelectedHasUnderground;
+        string? selectedDescriptionLanguage = SelectedDescriptionLanguage;
+        bool hideDuplicates = HideDuplicates;
         List<FactionType> selectedFactions = FactionFilters.Where(f => f.IsSelected).Select(f => f.Faction).ToList();
         List<SpellType> selectedSpells = SpellFilters.Where(f => f.IsSelected).Select(f => f.Spell).ToList();
         string searchText = SearchText;
@@ -477,6 +508,11 @@ public partial class MainWindowViewModel : ViewModelBase
                 filtered = filtered.Where(m => m.Map.HasUnderground == selectedHasUnderground.Value);
             }
 
+            if (!string.IsNullOrWhiteSpace(selectedDescriptionLanguage))
+            {
+                filtered = filtered.Where(m => string.Equals(m.Map.DescriptionLanguageName, selectedDescriptionLanguage, StringComparison.OrdinalIgnoreCase));
+            }
+
             if (selectedFactions.Count > 0)
             {
                 filtered = filtered.Where(m =>
@@ -501,6 +537,13 @@ public partial class MainWindowViewModel : ViewModelBase
                     (m.Map.Name?.Contains(searchText, StringComparison.OrdinalIgnoreCase) == true) ||
                     (m.Map.Description?.Contains(searchText, StringComparison.OrdinalIgnoreCase) == true)
                 );
+            }
+
+            if (hideDuplicates)
+            {
+                filtered = filtered
+                    .GroupBy(m => GetDuplicateKey(m.Map.Name, m.Map.Description), StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First());
             }
 
             List<MapItemViewModel> result = filtered.ToList();
@@ -530,6 +573,47 @@ public partial class MainWindowViewModel : ViewModelBase
         }, cancellationToken);
     }
 
+    public void SetSelectedMaps(IEnumerable<MapItemViewModel> selectedMaps)
+    {
+        _selectedMaps.Clear();
+        _selectedMaps.AddRange(selectedMaps);
+        SelectedMapCount = _selectedMaps.Count;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanExportSelectedMaps))]
+    private async Task ExportSelectedMaps()
+    {
+        List<MapItemViewModel> mapsToExport = _selectedMaps.ToList();
+        if (mapsToExport.Count == 0)
+        {
+            StatusMessage = "No maps selected for export.";
+            return;
+        }
+
+        var options = new FolderPickerOpenOptions
+        {
+            Title = "Select Export Directory",
+            AllowMultiple = false,
+        };
+
+        IReadOnlyList<IStorageFolder> results = await _storageProvider.OpenFolderPickerAsync(options);
+        if (results.Count == 0 || results[0].TryGetLocalPath() is not string exportRoot)
+        {
+            StatusMessage = "Export cancelled.";
+            return;
+        }
+
+        try
+        {
+            int exportedCount = await Task.Run(() => ExportMaps(mapsToExport, exportRoot));
+            StatusMessage = $"Exported {exportedCount} map{(exportedCount == 1 ? string.Empty : "s")}.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error exporting maps: {ex.Message}";
+        }
+    }
+
     [RelayCommand]
     private void ClearFilters()
     {
@@ -540,6 +624,8 @@ public partial class MainWindowViewModel : ViewModelBase
         SelectedVictoryCondition = null;
         SelectedFormat = null;
         SelectedHasUnderground = null;
+        SelectedDescriptionLanguage = null;
+        HideDuplicates = false;
 
         foreach (FactionFilterItemViewModel filter in FactionFilters)
         {
@@ -590,6 +676,114 @@ public partial class MainWindowViewModel : ViewModelBase
     private void UpdateSelectedSpellCount()
     {
         SelectedSpellCount = SpellFilters.Count(f => f.IsSelected);
+    }
+
+    private void ResetMapLanguageOptions()
+    {
+        MapLanguages.Clear();
+        MapLanguages.Add(null);
+        SelectedDescriptionLanguage = null;
+    }
+
+    private void AddMapLanguageOption(string languageName)
+    {
+        if (string.IsNullOrWhiteSpace(languageName) || MapLanguages.Any(language => string.Equals(language, languageName, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        int insertIndex = MapLanguages
+            .Skip(1)
+            .TakeWhile(language => string.Compare(language, languageName, StringComparison.OrdinalIgnoreCase) < 0)
+            .Count() + 1;
+
+        MapLanguages.Insert(insertIndex, languageName);
+    }
+
+    private static int ExportMaps(IEnumerable<MapItemViewModel> mapsToExport, string exportRoot)
+    {
+        Directory.CreateDirectory(exportRoot);
+
+        var exportedCount = 0;
+        foreach (MapItemViewModel map in mapsToExport)
+        {
+            string languageDirectory = Path.Combine(exportRoot, GetLanguageFolderName(map.Map.DescriptionLanguageName));
+            Directory.CreateDirectory(languageDirectory);
+
+            string extension = Path.GetExtension(map.FilePath);
+            string mapName = string.IsNullOrWhiteSpace(map.Map.Name)
+                ? Path.GetFileNameWithoutExtension(map.FilePath)
+                : map.Map.Name;
+            string fileName = $"[{GetMapFormatPrefix(map.Map.Format)}] - {SanitizeFileName(mapName)}{extension}";
+            string destinationPath = GetUniqueDestinationPath(languageDirectory, fileName);
+
+            File.Copy(map.FilePath, destinationPath);
+            exportedCount++;
+        }
+
+        return exportedCount;
+    }
+
+    private static string GetMapFormatPrefix(MapFormat format)
+    {
+        return format switch
+        {
+            MapFormat.RoE => "RoE",
+            MapFormat.AB => "AB",
+            MapFormat.SoD => "SoD",
+            MapFormat.WoG => "WoG",
+            MapFormat.HotA => "HotA",
+            _ => format.ToString(),
+        };
+    }
+
+    private static string GetLanguageFolderName(string? languageName)
+    {
+        return SanitizeFileName(string.IsNullOrWhiteSpace(languageName) ? "Unknown" : languageName);
+    }
+
+    private static string SanitizeFileName(string fileName)
+    {
+        char[] invalidChars = Path.GetInvalidFileNameChars();
+        string sanitized = new(fileName.Select(character => invalidChars.Contains(character) ? '_' : character).ToArray());
+        return string.IsNullOrWhiteSpace(sanitized) ? "Unknown map" : sanitized.Trim();
+    }
+
+    private static string GetUniqueDestinationPath(string directory, string fileName)
+    {
+        string destinationPath = Path.Combine(directory, fileName);
+        if (!File.Exists(destinationPath))
+        {
+            return destinationPath;
+        }
+
+        string baseName = Path.GetFileNameWithoutExtension(fileName);
+        string extension = Path.GetExtension(fileName);
+        var counter = 2;
+
+        do
+        {
+            destinationPath = Path.Combine(directory, $"{baseName} ({counter}){extension}");
+            counter++;
+        }
+        while (File.Exists(destinationPath));
+
+        return destinationPath;
+    }
+
+    private static string GetDuplicateKey(string? name, string? description)
+    {
+        return $"{NormalizeDuplicateText(name)}\n{NormalizeDuplicateText(description)}";
+    }
+
+    private static string NormalizeDuplicateText(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        return string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
     }
 
     private void SaveApplicationSettings()

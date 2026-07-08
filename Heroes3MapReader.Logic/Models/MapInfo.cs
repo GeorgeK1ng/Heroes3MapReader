@@ -23,6 +23,16 @@ public sealed class MapInfo
     public string Description { get; set; } = string.Empty;
 
     /// <summary>
+    /// ISO 639-3 code of the best-effort language detected from the map description.
+    /// </summary>
+    public string DescriptionLanguageCode { get; set; } = DetectedLanguage.Unknown.Code;
+
+    /// <summary>
+    /// Display name of the best-effort language detected from the map description.
+    /// </summary>
+    public string DescriptionLanguageName { get; set; } = DetectedLanguage.Unknown.Name;
+
+    /// <summary>
     /// Map difficulty level
     /// </summary>
     public MapDifficulty Difficulty { get; set; }

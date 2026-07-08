@@ -1,0 +1,192 @@
+name: Build artifacts
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  publish-windows:
+    name: Publish ${{ matrix.artifact_name }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runtime: win-x86
+            artifact_name: Heroes3MapReader-win-x86
+          - runtime: win-x64
+            artifact_name: Heroes3MapReader-win-x64
+          - runtime: win-arm64
+            artifact_name: Heroes3MapReader-win-arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Download public language dictionaries
+        shell: bash
+        run: scripts/download-language-dictionaries.sh
+
+      - name: Restore dependencies
+        run: dotnet restore Heroes3MapReader.sln --disable-parallel
+
+      - name: Build solution
+        run: dotnet build Heroes3MapReader.sln --configuration Release --no-restore --disable-build-servers -m:1 /p:BuildInParallel=false
+
+      - name: Publish Windows single-file EXE
+        run: >-
+          dotnet publish Heroes3MapReader.UI/Heroes3MapReader.UI.csproj
+          --configuration Release
+          --framework net8.0
+          --runtime ${{ matrix.runtime }}
+          --self-contained true
+          --output artifacts/${{ matrix.artifact_name }}
+          /p:PublishSingleFile=true
+          /p:IncludeNativeLibrariesForSelfExtract=true
+          /p:EnableCompressionInSingleFile=true
+          /p:DebugType=None
+          /p:DebugSymbols=false
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: artifacts/${{ matrix.artifact_name }}
+          if-no-files-found: error
+
+  publish-macos:
+    name: Publish ${{ matrix.artifact_name }}
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runtime: osx-x64
+            artifact_name: Heroes3MapReader-macos-intel
+          - runtime: osx-arm64
+            artifact_name: Heroes3MapReader-macos-arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Download public language dictionaries
+        shell: bash
+        run: scripts/download-language-dictionaries.sh
+
+      - name: Restore UI project
+        run: dotnet restore Heroes3MapReader.UI/Heroes3MapReader.UI.csproj --runtime ${{ matrix.runtime }}
+
+      - name: Publish macOS folder
+        run: >-
+          dotnet publish Heroes3MapReader.UI/Heroes3MapReader.UI.csproj
+          --configuration Release
+          --runtime ${{ matrix.runtime }}
+          --self-contained true
+          --no-restore
+          --output artifacts/${{ matrix.artifact_name }}
+          /p:DebugType=portable
+          /p:DebugSymbols=true
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: artifacts/${{ matrix.artifact_name }}
+          if-no-files-found: error
+
+  # .NET 8 does not provide a linux-x86 desktop runtime identifier, so the AppImage job
+  # builds supported Linux desktop targets: linux-x64 and linux-arm64.
+  publish-linux-appimage:
+    name: Publish ${{ matrix.artifact_name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runtime: linux-x64
+            appimage_arch: x86_64
+            appimagetool_arch: x86_64
+            artifact_name: Heroes3MapReader-linux-x64-AppImage
+          - runtime: linux-arm64
+            appimage_arch: aarch64
+            appimagetool_arch: x86_64
+            artifact_name: Heroes3MapReader-linux-arm64-AppImage
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Download public language dictionaries
+        shell: bash
+        run: scripts/download-language-dictionaries.sh
+
+      - name: Restore UI project
+        run: dotnet restore Heroes3MapReader.UI/Heroes3MapReader.UI.csproj --runtime ${{ matrix.runtime }}
+
+      - name: Publish Linux folder
+        run: >-
+          dotnet publish Heroes3MapReader.UI/Heroes3MapReader.UI.csproj
+          --configuration Release
+          --runtime ${{ matrix.runtime }}
+          --self-contained true
+          --no-restore
+          --output AppDir/usr/bin
+          /p:DebugType=portable
+          /p:DebugSymbols=true
+
+      - name: Build AppImage
+        shell: bash
+        run: |
+          mkdir -p AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/256x256/apps artifacts
+          cat > AppDir/AppRun <<'APP_RUN'
+          #!/usr/bin/env sh
+          HERE="$(dirname "$(readlink -f "$0")")"
+          exec "$HERE/usr/bin/Heroes3MapReader" "$@"
+          APP_RUN
+          chmod +x AppDir/AppRun
+          cat > AppDir/usr/share/applications/heroes3mapreader.desktop <<'DESKTOP'
+          [Desktop Entry]
+          Type=Application
+          Name=Heroes 3 Map Reader
+          Exec=Heroes3MapReader
+          Icon=heroes3mapreader
+          Categories=Game;Utility;
+          DESKTOP
+          python3 - <<'PY'
+          import base64
+          png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII='
+          open('AppDir/usr/share/icons/hicolor/256x256/apps/heroes3mapreader.png', 'wb').write(base64.b64decode(png))
+          PY
+          cp AppDir/usr/share/applications/heroes3mapreader.desktop AppDir/heroes3mapreader.desktop
+          cp AppDir/usr/share/icons/hicolor/256x256/apps/heroes3mapreader.png AppDir/heroes3mapreader.png
+          wget -q -O appimagetool https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-${{ matrix.appimagetool_arch }}.AppImage
+          chmod +x appimagetool
+          ARCH=${{ matrix.appimage_arch }} APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool AppDir artifacts/Heroes3MapReader-${{ matrix.appimage_arch }}.AppImage
+
+      - name: Upload Linux AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: artifacts/*.AppImage
+          if-no-files-found: error
+

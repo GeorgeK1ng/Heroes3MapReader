@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net8.0-android34.0</TargetFramework>
+        <SupportedOSPlatformVersion>23</SupportedOSPlatformVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <ApplicationId>com.cactuspie.heroes3mapreader</ApplicationId>
+        <ApplicationTitle>Heroes 3 Map Reader</ApplicationTitle>
+        <ApplicationVersion>7</ApplicationVersion>
+        <ApplicationDisplayVersion>1.7.0</ApplicationDisplayVersion>
+        <AndroidPackageFormat>apk</AndroidPackageFormat>
+        <AndroidLinkMode>None</AndroidLinkMode>
+        <AndroidLinkResources>false</AndroidLinkResources>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Avalonia.Android" Version="11.1.3" />
+        <PackageReference Include="Avalonia.Fonts.Inter" Version="11.1.3" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Heroes3MapReader.UI\Heroes3MapReader.UI.csproj"
+                          AdditionalProperties="EnableAndroidTargeting=true" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="$(NuGetPackageRoot)ntextcat\0.3.65\content\LanguageModels\*.profile.xml"
+              Link="LanguageModels\%(Filename)%(Extension)"
+              CopyToOutputDirectory="PreserveNewest"
+              CopyToPublishDirectory="PreserveNewest"
+              Condition="Exists('$(NuGetPackageRoot)ntextcat\0.3.65\content\LanguageModels')" />
+    </ItemGroup>
+</Project>
